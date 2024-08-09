@@ -26,12 +26,22 @@ SERVICES = '//ul[@id="service-list"]/li//*[@itemprop="name"]/text()'
 
 
 class AlbertsonsSpider(scrapy.Spider):
+    """
+    Spider for scraping Albertsons store information from local.albertsons.com
+    """
     name = "albertsons"
     allowed_domains = ["local.albertsons.com"]
     start_urls = ["https://local.albertsons.com/az.html"]
 
     def parse(self, response: scrapy.http.Response) -> Iterator[scrapy.Request]:
+        """
+        Parse the main page and follow links to individual store pages or sub-directories
+        """
         self.logger.info(f"Parsing page: {response.url}")
+        if not (response.xpath(DIRECTORY_LIST_LINKS) or response.xpath(DIRECTORY_LIST_TEASERS)):
+            self.logger.warning(f"No directory links or teasers found on {response.url}")
+            return
+
         if response.xpath(DIRECTORY_LIST_LINKS):
             for a_elem in response.xpath(f'{DIRECTORY_LIST_LINKS}/li/a'):
                 link = a_elem.xpath(STORE_LINK).get()
@@ -45,6 +55,9 @@ class AlbertsonsSpider(scrapy.Spider):
                 yield response.follow(link, callback=self.parse_store)
 
     def parse_store(self, response: scrapy.http.Response) -> Iterator[AlbertsonsStoreItem]:
+        """
+        Parse individual store pages and extract store information
+        """
         self.logger.info(f"Parsing store: {response.url}")
         store_data = AlbertsonsStoreItem()
 
@@ -65,17 +78,16 @@ class AlbertsonsSpider(scrapy.Spider):
 
         store_data['phone_number'] = self.clean_phone_number(response.xpath(PHONE_NUMBER).get())
 
-        latitude = response.xpath(LATITUDE).get()
-        longitude = response.xpath(LONGITUDE).get()
-
-        if latitude and longitude:
+        try:
+            latitude = float(response.xpath(LATITUDE).get())
+            longitude = float(response.xpath(LONGITUDE).get())
             store_data['location'] = {
                 'type': 'Point',
-                'coordinates': [float(longitude), float(latitude)]
+                'coordinates': [longitude, latitude]
             }
-        else:
+        except (TypeError, ValueError):
             store_data['location'] = None
-            self.logger.warning(f"No location data for store: {store_data['name']}")
+            self.logger.warning(f"Invalid location data for store: {store_data['name']}")
 
         store_hours_container = response.xpath(HOURS_CONTAINER)[0]
         hours_detail_rows = store_hours_container.xpath(HOURS_ROWS)
@@ -85,7 +97,12 @@ class AlbertsonsSpider(scrapy.Spider):
             day = self.clean_text(row.xpath(HOURS_DAY).get()).lower()
             open_time = self.clean_text(row.xpath(HOURS_OPEN).get()).lower()
             close_time = self.clean_text(row.xpath(HOURS_CLOSE).get()).lower()
-            hours[day] = {"open": open_time, "close": close_time}
+            if open_time == "closed":
+                hours[day] = "Closed"
+            elif open_time == "open 24 hours":
+                hours[day] = "24 hours"
+            else:
+                hours[day] = {"open": open_time, "close": close_time}
 
         store_data['hours'] = hours
 
@@ -98,14 +115,18 @@ class AlbertsonsSpider(scrapy.Spider):
 
     @staticmethod
     def clean_text(text: Optional[str]) -> str:
+        """Clean and strip whitespace from text"""
         return text.strip() if text else ""
 
     @staticmethod
     def clean_phone_number(phone: Optional[str]) -> str:
+        """Extract digits from phone number string"""
         if not phone:
             return ""
         return ''.join(char for char in phone if char.isdigit())
 
     @staticmethod
     def clean_service(service: str) -> str:
-        return service.replace("[c_groceryBrand]", "Albertsons").replace("[name]", "Albertsons").strip()
+        """Clean and format service string"""
+        service = service.replace("[c_groceryBrand]", "Albertsons").replace("[name]", "Albertsons").strip()
+        return ' '.join(word.capitalize() for word in service.split())
