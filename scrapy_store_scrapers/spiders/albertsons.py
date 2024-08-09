@@ -1,53 +1,72 @@
 import scrapy
+from typing import Iterator, Optional
+from scrapy_store_scrapers.items import AlbertsonsStoreItem
+
+# Constants for XPath expressions
+DIRECTORY_LIST_LINKS = '//ul[@class="Directory-listLinks"]'
+DIRECTORY_LIST_TEASERS = '//ul[@class="Directory-listTeasers Directory-row"]'
+STORE_LINK = './@href'
+STORE_COUNT = './@data-count'
+
+STORE_NAME = '//h1/span[@class="RedesignHero-subtitle Heading--lead"]/text()'
+ADDRESS_ELEM = '//address[@itemprop="address"]'
+STREET_ADDRESS = './/span[@class="c-address-street-1"]/text()'
+CITY = './/span[@class="c-address-city"]/text()'
+REGION = './/abbr[@itemprop="addressRegion"]/text()'
+POSTAL_CODE = './/span[@itemprop="postalCode"]/text()'
+PHONE_NUMBER = '//div[@id="phone-main"]/text()'
+LATITUDE = '//meta[@itemprop="latitude"]/@content'
+LONGITUDE = '//meta[@itemprop="longitude"]/@content'
+HOURS_CONTAINER = '//div[@class="RedesignCore-hours js-intent-core-hours is-hidden"]'
+HOURS_ROWS = './/table[@class="c-hours-details"]/tbody/tr'
+HOURS_DAY = './td[@class="c-hours-details-row-day"]/text()'
+HOURS_OPEN = './/span[@class="c-hours-details-row-intervals-instance-open"]/text()'
+HOURS_CLOSE = './/span[@class="c-hours-details-row-intervals-instance-close"]/text()'
+SERVICES = '//ul[@id="service-list"]/li//*[@itemprop="name"]/text()'
 
 
 class AlbertsonsSpider(scrapy.Spider):
     name = "albertsons"
     allowed_domains = ["local.albertsons.com"]
     start_urls = ["https://local.albertsons.com/az.html"]
-    # start_urls = ["http://local.albertsons.com/"]
 
-    def parse(self, response):
-        if response.xpath('//ul[@class="Directory-listLinks"]'):
-            for a_elem in response.xpath('//ul[@class="Directory-listLinks"]/li/a'):
-                link = a_elem.xpath('./@href').get()
-                is_multiple_stores = a_elem.xpath(
-                    './@data-count').get('').strip() != '(1)'
+    def parse(self, response: scrapy.http.Response) -> Iterator[scrapy.Request]:
+        self.logger.info(f"Parsing page: {response.url}")
+        if response.xpath(DIRECTORY_LIST_LINKS):
+            for a_elem in response.xpath(f'{DIRECTORY_LIST_LINKS}/li/a'):
+                link = a_elem.xpath(STORE_LINK).get()
+                is_multiple_stores = a_elem.xpath(STORE_COUNT).get('').strip() != '(1)'
                 if is_multiple_stores:
                     yield response.follow(link, callback=self.parse)
                 else:
                     yield response.follow(link, callback=self.parse_store)
-        elif response.xpath('//ul[@class="Directory-listTeasers Directory-row"]'):
-            for link in response.xpath('//ul[@class="Directory-listTeasers Directory-row"]/li/article/h2/a/@href').getall():
+        elif response.xpath(DIRECTORY_LIST_TEASERS):
+            for link in response.xpath(f'{DIRECTORY_LIST_TEASERS}/li/article/h2/a/@href').getall():
                 yield response.follow(link, callback=self.parse_store)
-        # //ul[@class="Directory-listTeasers Directory-row"]/li/article/h2/a/@href
 
-    def parse_store(self, response):
-        store_data = {}
+    def parse_store(self, response: scrapy.http.Response) -> Iterator[AlbertsonsStoreItem]:
+        self.logger.info(f"Parsing store: {response.url}")
+        store_data = AlbertsonsStoreItem()
 
-        store_data['name'] = response.xpath(
-            '//h1/span[@class="RedesignHero-subtitle Heading--lead"]/text()').get('').strip()
+        store_data['name'] = self.clean_text(response.xpath(STORE_NAME).get())
+        if not store_data['name']:
+            self.logger.warning(f"No store name found for {response.url}")
+            return
 
-        address_elem = response.xpath('//address[@itemprop="address"]')
-
-        street_address = address_elem.xpath(
-            './/span[@class="c-address-street-1"]/text()').get('').strip()
-        city = address_elem.xpath(
-            './/span[@class="c-address-city"]/text()').get('').strip()
-        region = address_elem.xpath(
-            './/abbr[@itemprop="addressRegion"]/text()').get('').strip()
-        postal_code = address_elem.xpath(
-            './/span[@itemprop="postalCode"]/text()').get('').strip()
+        address_elem = response.xpath(ADDRESS_ELEM)
+        street_address = self.clean_text(address_elem.xpath(STREET_ADDRESS).get())
+        city = self.clean_text(address_elem.xpath(CITY).get())
+        region = self.clean_text(address_elem.xpath(REGION).get())
+        postal_code = self.clean_text(address_elem.xpath(POSTAL_CODE).get())
 
         store_data['address'] = f"{street_address}, {city}, {region} {postal_code}"
+        if not all([street_address, city, region, postal_code]):
+            self.logger.warning(f"Incomplete address for store: {store_data['name']}")
 
-        store_data['phone_number'] = response.xpath(
-            '//div[@id="phone-main"]/text()').get('')
+        store_data['phone_number'] = self.clean_phone_number(response.xpath(PHONE_NUMBER).get())
 
-        latitude = response.xpath(
-            '//meta[@itemprop="latitude"]/@content').get('')
-        longitude = response.xpath(
-            '//meta[@itemprop="longitude"]/@content').get('')
+        latitude = response.xpath(LATITUDE).get()
+        longitude = response.xpath(LONGITUDE).get()
 
         if latitude and longitude:
             store_data['location'] = {
@@ -56,33 +75,37 @@ class AlbertsonsSpider(scrapy.Spider):
             }
         else:
             store_data['location'] = None
+            self.logger.warning(f"No location data for store: {store_data['name']}")
 
-        store_hours_container = response.xpath(
-            '//div[@class="RedesignCore-hours js-intent-core-hours is-hidden"]')[0]
-        hours_detail_rows = store_hours_container.xpath(
-            './/table[@class="c-hours-details"]/tbody/tr')
+        store_hours_container = response.xpath(HOURS_CONTAINER)[0]
+        hours_detail_rows = store_hours_container.xpath(HOURS_ROWS)
 
         hours = {}
-
         for row in hours_detail_rows:
-            day = row.xpath(
-                './td[@class="c-hours-details-row-day"]/text()').get('').strip().lower()
-            open_time = row.xpath(
-                './/span[@class="c-hours-details-row-intervals-instance-open"]/text()').get('').strip()
-            close_time = row.xpath(
-                './/span[@class="c-hours-details-row-intervals-instance-close"]/text()').get('').strip()
-            hours[day] = {
-                "open": open_time.lower(),
-                "close": close_time.lower()
-            }
+            day = self.clean_text(row.xpath(HOURS_DAY).get()).lower()
+            open_time = self.clean_text(row.xpath(HOURS_OPEN).get()).lower()
+            close_time = self.clean_text(row.xpath(HOURS_CLOSE).get()).lower()
+            hours[day] = {"open": open_time, "close": close_time}
 
         store_data['hours'] = hours
 
-        services = response.xpath(
-            '//ul[@id="service-list"]/li//*[@itemprop="name"]/text()').getall()
-
+        services = response.xpath(SERVICES).getall()
         store_data['services'] = [
-            service.replace("[c_groceryBrand]", "Albertsons").replace("[name]", "Albertsons")
-            for service in services]
+            self.clean_service(service) for service in services
+        ]
 
         yield store_data
+
+    @staticmethod
+    def clean_text(text: Optional[str]) -> str:
+        return text.strip() if text else ""
+
+    @staticmethod
+    def clean_phone_number(phone: Optional[str]) -> str:
+        if not phone:
+            return ""
+        return ''.join(char for char in phone if char.isdigit())
+
+    @staticmethod
+    def clean_service(service: str) -> str:
+        return service.replace("[c_groceryBrand]", "Albertsons").replace("[name]", "Albertsons").strip()

@@ -1,12 +1,11 @@
-# Define here the models for your scraped items
-#
-# See documentation in:
-# https://docs.scrapy.org/en/latest/topics/items.html
-
-import scrapy
+from scrapy import Item, Field
+from typing import Optional
 
 
-class ScrapyStoreScrapersItem(scrapy.Item):
-    # define the fields for your item here like:
-    # name = scrapy.Field()
-    pass
+class AlbertsonsStoreItem(Item):
+    name: str = Field()
+    address: str = Field()
+    phone_number: str = Field()
+    location: dict[str, list[float]] = Field()
+    hours: dict[str, dict[str, str]] = Field()
+    services: list[str] = Field()
