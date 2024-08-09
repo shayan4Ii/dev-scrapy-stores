@@ -31,7 +31,7 @@ class AlbertsonsSpider(scrapy.Spider):
     """
     name = "albertsons"
     allowed_domains = ["local.albertsons.com"]
-    start_urls = ["https://local.albertsons.com/az.html"]
+    start_urls = ["https://local.albertsons.com/index.html"]
 
     def parse(self, response: scrapy.http.Response) -> Iterator[scrapy.Request]:
         """
