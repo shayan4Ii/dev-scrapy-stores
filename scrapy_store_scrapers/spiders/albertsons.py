@@ -76,7 +76,7 @@ class AlbertsonsSpider(scrapy.Spider):
         if not all([street_address, city, region, postal_code]):
             self.logger.warning(f"Incomplete address for store: {store_data['name']}")
 
-        store_data['phone_number'] = self.clean_phone_number(response.xpath(PHONE_NUMBER).get())
+        store_data['phone_number'] = response.xpath(PHONE_NUMBER).get()
 
         try:
             latitude = float(response.xpath(LATITUDE).get())
@@ -97,12 +97,7 @@ class AlbertsonsSpider(scrapy.Spider):
             day = self.clean_text(row.xpath(HOURS_DAY).get()).lower()
             open_time = self.clean_text(row.xpath(HOURS_OPEN).get()).lower()
             close_time = self.clean_text(row.xpath(HOURS_CLOSE).get()).lower()
-            if open_time == "closed":
-                hours[day] = "Closed"
-            elif open_time == "open 24 hours":
-                hours[day] = "24 hours"
-            else:
-                hours[day] = {"open": open_time, "close": close_time}
+            hours[day] = {"open": open_time, "close": close_time}
 
         store_data['hours'] = hours
 
@@ -119,14 +114,7 @@ class AlbertsonsSpider(scrapy.Spider):
         return text.strip() if text else ""
 
     @staticmethod
-    def clean_phone_number(phone: Optional[str]) -> str:
-        """Extract digits from phone number string"""
-        if not phone:
-            return ""
-        return ''.join(char for char in phone if char.isdigit())
-
-    @staticmethod
     def clean_service(service: str) -> str:
-        """Clean and format service string"""
+        """Clean service string"""
         service = service.replace("[c_groceryBrand]", "Albertsons").replace("[name]", "Albertsons").strip()
-        return ' '.join(word.capitalize() for word in service.split())
+        return service
