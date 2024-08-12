@@ -110,8 +110,33 @@ FEED_EXPORT_ENCODING = "utf-8"
 
 # Logging configuration
 import os
+import logging
 from datetime import datetime
 
-LOG_LEVEL = 'ERROR'
+# Set up logging to file
 LOG_FILE = os.path.join('logs', f'error_log_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+LOG_FILE_LEVEL = 'ERROR'
+
+# Set up logging to console
+LOG_LEVEL = 'DEBUG'
 LOG_ENABLED = True
+
+# Custom logging settings
+LOG_FORMAT = '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
+LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format=LOG_FORMAT,
+    datefmt=LOG_DATEFORMAT,
+)
+
+# Add FileHandler for error logs
+file_handler = logging.FileHandler(LOG_FILE)
+file_handler.setLevel(logging.ERROR)
+file_handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATEFORMAT))
+
+# Get the root logger and add the file handler
+root_logger = logging.getLogger()
+root_logger.addHandler(file_handler)
