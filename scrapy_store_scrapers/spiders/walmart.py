@@ -2,6 +2,7 @@ import scrapy
 from typing import Dict, Iterator, List, Any
 import json
 from datetime import datetime
+from scrapy_store_scrapers.items import WalmartStoreItem
 
 class WalmartSpider(scrapy.Spider):
     name: str = "walmart"
@@ -57,22 +58,22 @@ class WalmartSpider(scrapy.Spider):
             store_url = f"https://www.walmart.com/store/{store_id}"
             yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
 
-    def parse_store(self, response: scrapy.http.Response) -> Dict[str, Any]:
+    def parse_store(self, response: scrapy.http.Response) -> WalmartStoreItem:
         script_content = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
         
         json_data: Dict[str, Any] = json.loads(script_content)
         store_data: Dict[str, Any] = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
 
-        store_item: Dict[str, Any] = {
-            'name': store_data['displayName'],
-            'address': self.format_address(store_data['address']),
-            'city': store_data['address']['city'],
-            'state': store_data['address']['state'],
-            'phone_number': store_data['phoneNumber'],
-            'hours': self.format_hours(store_data['operationalHours']),
-            'services': [service['displayName'] for service in store_data['services']],
-            'url': response.url
-        }
+        store_item = WalmartStoreItem(
+            name=store_data['displayName'],
+            address=self.format_address(store_data['address']),
+            city=store_data['address']['city'],
+            state=store_data['address']['state'],
+            phone_number=store_data['phoneNumber'],
+            hours=self.format_hours(store_data['operationalHours']),
+            services=[service['displayName'] for service in store_data['services']],
+            url=response.url
+        )
 
         yield store_item
 
