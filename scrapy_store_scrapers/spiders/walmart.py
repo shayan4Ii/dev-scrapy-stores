@@ -1,6 +1,6 @@
 import scrapy
 from typing import Dict, Iterator
-
+import json
 
 class WalmartSpider(scrapy.Spider):
     name = "walmart"
@@ -23,5 +23,56 @@ class WalmartSpider(scrapy.Spider):
         for url in self.start_urls:
             yield scrapy.Request(url=url, headers=self.get_default_headers(), callback=self.parse)
 
+    def extract_store_ids(self, stores_per_city_dict):
+        store_ids = []
+
+        for state, cities in stores_per_city_dict.items():
+            for city_data in cities:
+                if 'stores' in city_data:
+                    stores = city_data['stores']
+                    if not isinstance(stores, list):
+                        self.logger.error(f"Stores data is not a list for city in state {state}: {city_data}")
+                        continue
+                else:
+                    stores = [city_data]  # Treat the city_data itself as a store
+
+                for store in stores:
+                    store_id = store.get('storeId') or store.get('storeid')
+                    if store_id:
+                        store_ids.append(store_id)
+                    else:
+                        self.logger.warning(f"No store ID found for store in state {state}: {store}")
+
+        return store_ids
+
     def parse(self, response):
+        script_text = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
+        json_data = json.loads(script_text)
+        # props.pageProps.bootstrapData.cv.storepages._all_.sdStoresPerCityPerState
+        stores_per_city = json_data["props"]["pageProps"]["bootstrapData"]["cv"]["storepages"]["_all_"]["sdStoresPerCityPerState"]
+
+        stores_per_city_dict = json.loads(stores_per_city.strip('"'))
+
+        # store_ids = []
+
+        # for state, cities in stores_per_city_dict.items():
+        #     for city_data in cities:
+        #         if 'stores' in city_data:
+        #             if not isinstance(city_data['stores'], list):
+        #                 # self.logger.error(f"City data is not a list: {city_data}")
+        #                 continue
+        #             for store in city_data['stores']:
+        #                 store_id = store.get('storeId') or store.get('storeid')
+        #                 store_ids.append(store_id)
+        #         elif 'storeId' in city_data:
+        #             store_ids.append(city_data['storeId'])
+
+        store_ids = self.extract_store_ids(stores_per_city_dict)
+        self.logger.info(f"Found {len(store_ids)} store IDs")
+
+        for store_id in store_ids:
+            store_url = f"https://www.walmart.com/store/{store_id}"
+            yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
+
+    def parse_store(self, response):
         pass
