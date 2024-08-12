@@ -5,12 +5,14 @@ from datetime import datetime
 from scrapy_store_scrapers.items import WalmartStoreItem
 
 class WalmartSpider(scrapy.Spider):
+    """Spider for scraping Walmart store information."""
     name: str = "walmart"
     allowed_domains: List[str] = ["www.walmart.com"]
     start_urls: List[str] = ["https://www.walmart.com/store-directory"]
 
     @staticmethod
     def get_default_headers() -> Dict[str, str]:
+        """Return default headers for requests."""
         return {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -22,10 +24,12 @@ class WalmartSpider(scrapy.Spider):
         }
 
     def start_requests(self) -> Iterator[scrapy.Request]:
+        """Generate initial requests for store directory pages."""
         for url in self.start_urls:
             yield scrapy.Request(url=url, headers=self.get_default_headers(), callback=self.parse_store_directory)
 
     def extract_store_ids(self, stores_by_location: Dict[str, List[Dict[str, Any]]]) -> List[str]:
+        """Extract store IDs from the stores by location data."""
         store_ids = []
 
         for state, cities in stores_by_location.items():
@@ -36,6 +40,7 @@ class WalmartSpider(scrapy.Spider):
                     continue
 
                 for store in stores:
+                    # Try both 'storeId' and 'storeid' keys
                     store_id = store.get('storeId') or store.get('storeid')
                     if store_id:
                         store_ids.append(str(store_id))
@@ -45,12 +50,16 @@ class WalmartSpider(scrapy.Spider):
         return store_ids
 
     def parse_store_directory(self, response: scrapy.http.Response) -> Iterator[scrapy.Request]:
+        """Parse the store directory page and yield requests for individual store pages."""
+        # Extract JSON data from script tag
         script_content = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
         json_data = json.loads(script_content)
 
+        # Extract stores by location data
         stores_by_location_json = json_data["props"]["pageProps"]["bootstrapData"]["cv"]["storepages"]["_all_"]["sdStoresPerCityPerState"]
         stores_by_location = json.loads(stores_by_location_json.strip('"'))
 
+        # Extract store IDs and generate requests for each store
         store_ids = self.extract_store_ids(stores_by_location)
         self.logger.info(f"Found {len(store_ids)} store IDs")
 
@@ -59,11 +68,14 @@ class WalmartSpider(scrapy.Spider):
             yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
 
     def parse_store(self, response: scrapy.http.Response) -> WalmartStoreItem:
+        """Parse individual store page and extract store information."""
+        # Extract JSON data from script tag
         script_content = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
         
         json_data = json.loads(script_content)
         store_data = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
 
+        # Create and return WalmartStoreItem
         store_item = WalmartStoreItem(
             name=store_data['displayName'],
             address=self.format_address(store_data['address']),
@@ -79,9 +91,11 @@ class WalmartSpider(scrapy.Spider):
 
     @staticmethod
     def format_address(address: Dict[str, str]) -> str:
+        """Format the store address."""
         return f"{address['addressLineOne']}, {address['city']}, {address['state']} {address['postalCode']}"
 
     def format_hours(self, operational_hours: List[Dict[str, str]]) -> Dict[str, Dict[str, str]]:
+        """Format the store operational hours."""
         formatted_hours = {}
         for day_hours in operational_hours:
             formatted_hours[day_hours['day']] = {
@@ -92,5 +106,6 @@ class WalmartSpider(scrapy.Spider):
 
     @staticmethod
     def convert_to_12h_format(time_str: str) -> str:
+        """Convert 24-hour time format to 12-hour format."""
         time_obj = datetime.strptime(time_str, '%H:%M').time()
         return time_obj.strftime('%I:%M %p').lower()
