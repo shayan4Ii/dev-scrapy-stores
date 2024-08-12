@@ -107,3 +107,5 @@ venv.bak/
 *.jl
 delivery_command.txt
 zip_project.py
+project.zip
+task.txt

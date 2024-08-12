@@ -23,12 +23,12 @@ NEWSPIDER_MODULE = "scrapy_store_scrapers.spiders"
 ROBOTSTXT_OBEY = True
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 5
+# CONCURRENT_REQUESTS = 1
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-DOWNLOAD_DELAY = .25
+# DOWNLOAD_DELAY = 1
 # The download delay setting will honor only one of:
 # CONCURRENT_REQUESTS_PER_DOMAIN = 16
 # CONCURRENT_REQUESTS_PER_IP = 16
@@ -56,7 +56,7 @@ DOWNLOAD_DELAY = .25
 DOWNLOADER_MIDDLEWARES = {
     'scrapy.downloadermiddlewares.retry.RetryMiddleware': 90,
     'scrapy.downloadermiddlewares.httpcompression.HttpCompressionMiddleware': 810,
-    'scrapy_store_scrapers.middlewares.RotateHeadersMiddleware': 400,
+    # 'scrapy_store_scrapers.middlewares.RotateHeadersMiddleware': 400,
 }
 
 # Retry settings
@@ -110,29 +110,3 @@ USER_AGENTS = [
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
-
-# Logging configuration
-
-# Set up logging to file (INFO logs and above)
-LOG_FILE = os.path.join(
-    'logs', f'scrapy_log_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
-LOG_FILE_LEVEL = 'INFO'
-
-# Set up logging to console (INFO and above)
-LOG_LEVEL = 'INFO'
-LOG_ENABLED = True
-
-# Custom logging settings
-LOG_FORMAT = '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
-LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
-
-# Configure Scrapy's built-in logging
-# Disable logging to stdout (we'll use a StreamHandler instead)
-LOG_STDOUT = False
-
-# Add a StreamHandler to log to console
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-formatter = logging.Formatter(LOG_FORMAT, LOG_DATEFORMAT)
-console_handler.setFormatter(formatter)
-logging.getLogger().addHandler(console_handler)
