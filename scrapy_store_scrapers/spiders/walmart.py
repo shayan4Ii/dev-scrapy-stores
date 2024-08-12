@@ -1,5 +1,5 @@
 import scrapy
-from typing import Dict, Iterator
+from typing import Dict, Iterator, List
 import json
 from datetime import datetime
 
@@ -22,20 +22,17 @@ class WalmartSpider(scrapy.Spider):
 
     def start_requests(self) -> Iterator[scrapy.Request]:
         for url in self.start_urls:
-            yield scrapy.Request(url=url, headers=self.get_default_headers(), callback=self.parse)
+            yield scrapy.Request(url=url, headers=self.get_default_headers(), callback=self.parse_store_directory)
 
-    def extract_store_ids(self, stores_per_city_dict):
+    def extract_store_ids(self, stores_by_location: Dict) -> List[str]:
         store_ids = []
 
-        for state, cities in stores_per_city_dict.items():
+        for state, cities in stores_by_location.items():
             for city_data in cities:
-                if 'stores' in city_data:
-                    stores = city_data['stores']
-                    if not isinstance(stores, list):
-                        self.logger.error(f"Stores data is not a list for city in state {state}: {city_data}")
-                        continue
-                else:
-                    stores = [city_data]  # Treat the city_data itself as a store
+                stores = city_data.get('stores', [city_data])
+                if not isinstance(stores, list):
+                    self.logger.error(f"Stores data is not a list for city in state {state}: {city_data}")
+                    continue
 
                 for store in stores:
                     store_id = store.get('storeId') or store.get('storeid')
@@ -46,15 +43,14 @@ class WalmartSpider(scrapy.Spider):
 
         return store_ids
 
-    def parse(self, response):
-        script_text = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
-        json_data = json.loads(script_text)
+    def parse_store_directory(self, response):
+        script_content = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
+        json_data = json.loads(script_content)
 
-        stores_per_city = json_data["props"]["pageProps"]["bootstrapData"]["cv"]["storepages"]["_all_"]["sdStoresPerCityPerState"]
+        stores_by_location_json = json_data["props"]["pageProps"]["bootstrapData"]["cv"]["storepages"]["_all_"]["sdStoresPerCityPerState"]
+        stores_by_location = json.loads(stores_by_location_json.strip('"'))
 
-        stores_per_city_dict = json.loads(stores_per_city.strip('"'))
-
-        store_ids = self.extract_store_ids(stores_per_city_dict)
+        store_ids = self.extract_store_ids(stores_by_location)
         self.logger.info(f"Found {len(store_ids)} store IDs")
 
         for store_id in store_ids:
@@ -62,12 +58,12 @@ class WalmartSpider(scrapy.Spider):
             yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
 
     def parse_store(self, response):
-        script_text = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
+        script_content = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
         
-        json_data = json.loads(script_text)
+        json_data = json.loads(script_content)
         store_data = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
 
-        item = {
+        store_item = {
             'name': store_data['displayName'],
             'address': self.format_address(store_data['address']),
             'city': store_data['address']['city'],
@@ -78,22 +74,22 @@ class WalmartSpider(scrapy.Spider):
             'url': response.url
         }
 
-        yield item
+        yield store_item
 
-        
-    def format_address(self, address):
+    @staticmethod
+    def format_address(address: Dict[str, str]) -> str:
         return f"{address['addressLineOne']}, {address['city']}, {address['state']} {address['postalCode']}"
 
-    def format_hours(self, operational_hours):
+    def format_hours(self, operational_hours: List[Dict[str, str]]) -> Dict[str, Dict[str, str]]:
         formatted_hours = {}
-        for day in operational_hours:
-            formatted_hours[day['day']] = {
-                "open": self.convert_to_12h_format(day['start']),
-                "close": self.convert_to_12h_format(day['end'])
+        for day_hours in operational_hours:
+            formatted_hours[day_hours['day']] = {
+                "open": self.convert_to_12h_format(day_hours['start']),
+                "close": self.convert_to_12h_format(day_hours['end'])
             }
         return formatted_hours
 
     @staticmethod
-    def convert_to_12h_format(time_str):
-        t = datetime.strptime(time_str, '%H:%M').time()
-        return t.strftime('%I:%M %p').lower()
+    def convert_to_12h_format(time_str: str) -> str:
+        time_obj = datetime.strptime(time_str, '%H:%M').time()
+        return time_obj.strftime('%I:%M %p').lower()
