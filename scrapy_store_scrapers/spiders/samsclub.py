@@ -18,6 +18,7 @@ class SamsclubSpider(scrapy.Spider):
         yield scrapy.Request(url=url, headers=headers, callback=self.parse)
 
     def parse(self, response: scrapy.http.Response):
+        all_clubs = response.json()
 
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
