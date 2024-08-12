@@ -55,6 +55,21 @@ class ScrapyStoreScrapersSpiderMiddleware:
     def spider_opened(self, spider):
         spider.logger.info("Spider opened: %s" % spider.name)
 
+from scrapy.downloadermiddlewares.useragent import UserAgentMiddleware
+import random
+
+class RotateHeadersMiddleware(UserAgentMiddleware):
+    def __init__(self, user_agents):
+        self.user_agents = user_agents
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler.settings.getlist('USER_AGENTS'))
+
+    def process_request(self, request, spider):
+        user_agent = random.choice(self.user_agents)
+        request.headers['User-Agent'] = user_agent
+
 
 class ScrapyStoreScrapersDownloaderMiddleware:
     # Not all methods need to be defined. If a method is not defined,
