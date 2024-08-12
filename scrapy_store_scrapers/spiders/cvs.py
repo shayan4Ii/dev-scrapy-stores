@@ -25,23 +25,45 @@ class CvsSpider(scrapy.Spider):
                         'city': city,
                         'state': state,
                         'cbsa': cbsa,
-                        'zipcode': zipcode
+                        'zipcode': zipcode,
+                        'page': 1
                     }
                 )
 
     def parse(self, response):
         # Parse the JSON response
         data = json.loads(response.text)
-        # Process the data as needed
-        # For example, you can yield items or make further requests
-        for store in data.get('stores', []):
+        
+        # Yield each store from storeList as it is
+        for store in data.get('storeList', []):
             yield {
                 'city': response.meta['city'],
                 'state': response.meta['state'],
                 'cbsa': response.meta['cbsa'],
                 'zipcode': response.meta['zipcode'],
-                'store_data': store
+                'store': store
             }
+
+        # Check if there are more pages
+        total_results = data.get('totalResults', 0)
+        current_page = response.meta['page']
+        results_per_page = 5  # As per the API request
+
+        if total_results > current_page * results_per_page:
+            next_page = current_page + 1
+            next_url = response.url.replace(f"pageNum={current_page}", f"pageNum={next_page}")
+            yield scrapy.Request(
+                next_url,
+                self.parse,
+                headers=self.get_headers(),
+                meta={
+                    'city': response.meta['city'],
+                    'state': response.meta['state'],
+                    'cbsa': response.meta['cbsa'],
+                    'zipcode': response.meta['zipcode'],
+                    'page': next_page
+                }
+            )
 
     @staticmethod
     def get_headers():
