@@ -3,6 +3,8 @@ from typing import Dict, Iterator, List, Any
 import json
 from datetime import datetime
 from scrapy_store_scrapers.items import WalmartStoreItem
+from scrapy.exceptions import IgnoreRequest
+import logging
 
 class WalmartSpider(scrapy.Spider):
     """Spider for scraping Walmart store information."""
@@ -51,47 +53,68 @@ class WalmartSpider(scrapy.Spider):
 
     def parse_store_directory(self, response: scrapy.http.Response) -> Iterator[scrapy.Request]:
         """Parse the store directory page and yield requests for individual store pages."""
-        # Extract JSON data from script tag
-        script_content = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
-        json_data = json.loads(script_content)
+        try:
+            # Extract JSON data from script tag
+            script_content = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
+            if not script_content:
+                raise ValueError("Script content not found")
+            
+            json_data = json.loads(script_content)
 
-        # Extract stores by location data
-        stores_by_location_json = json_data["props"]["pageProps"]["bootstrapData"]["cv"]["storepages"]["_all_"]["sdStoresPerCityPerState"]
-        stores_by_location = json.loads(stores_by_location_json.strip('"'))
+            # Extract stores by location data
+            stores_by_location_json = json_data["props"]["pageProps"]["bootstrapData"]["cv"]["storepages"]["_all_"]["sdStoresPerCityPerState"]
+            stores_by_location = json.loads(stores_by_location_json.strip('"'))
 
-        # Extract store IDs and generate requests for each store
-        store_ids = self.extract_store_ids(stores_by_location)
-        self.logger.info(f"Found {len(store_ids)} store IDs")
+            # Extract store IDs and generate requests for each store
+            store_ids = self.extract_store_ids(stores_by_location)
+            self.logger.info(f"Found {len(store_ids)} store IDs")
 
-        for store_id in store_ids:
-            store_url = f"https://www.walmart.com/store/{store_id}"
-            yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
+            for store_id in store_ids:
+                store_url = f"https://www.walmart.com/store/{store_id}"
+                yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
+        except json.JSONDecodeError as e:
+            self.logger.error(f"JSON decode error in parse_store_directory: {str(e)}")
+        except KeyError as e:
+            self.logger.error(f"Key error in parse_store_directory: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error in parse_store_directory: {str(e)}")
 
     def parse_store(self, response: scrapy.http.Response) -> WalmartStoreItem:
         """Parse individual store page and extract store information."""
-        # Extract JSON data from script tag
-        script_content = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
+        try:
+            # Extract JSON data from script tag
+            script_content = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
+            if not script_content:
+                raise ValueError("Script content not found")
+            
+            json_data = json.loads(script_content)
+            store_data = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
+
+            store_latitude, store_longitude = self.extract_geo_info(store_data['geoPoint'])
+
+            # Create and return WalmartStoreItem
+            store_item = WalmartStoreItem(
+                name=store_data['displayName'],
+                number=int(store_data['id']),
+                address=self.format_address(store_data['address']),
+                phone_number=store_data['phoneNumber'],
+                hours=self.format_hours(store_data['operationalHours']),
+                location={
+                    "type": "Point",
+                    "coordinates": [store_longitude, store_latitude]
+                },
+                services=[service['displayName'] for service in store_data['services']],
+            )
+
+            return store_item
+        except json.JSONDecodeError as e:
+            self.logger.error(f"JSON decode error in parse_store for {response.url}: {str(e)}")
+        except KeyError as e:
+            self.logger.error(f"Key error in parse_store for {response.url}: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error in parse_store for {response.url}: {str(e)}")
         
-        json_data = json.loads(script_content)
-        store_data = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
-
-        store_latitude, store_longitude = self.extract_geo_info(store_data['geoPoint'])
-
-        # Create and return WalmartStoreItem
-        store_item = WalmartStoreItem(
-            name=store_data['displayName'],
-            number=int(store_data['id']),
-            address=self.format_address(store_data['address']),
-            phone_number=store_data['phoneNumber'],
-            hours=self.format_hours(store_data['operationalHours']),
-            location={
-                "type": "Point",
-                "coordinates": [store_longitude, store_latitude]
-            },
-            services=[service['displayName'] for service in store_data['services']],
-        )
-
-        return store_item
+        raise IgnoreRequest(f"Failed to parse store data for {response.url}")
 
     @staticmethod
     def format_address(address: Dict[str, str]) -> str:
