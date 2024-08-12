@@ -1,5 +1,5 @@
 from scrapy import Item, Field
-from typing import Optional
+from typing import Optional, Union
 
 
 class AlbertsonsStoreItem(Item):
@@ -15,5 +15,5 @@ class SamsclubItem(Item):
     address: str = Field()
     phone: str = Field()
     hours: dict[str, dict[str, str]] = Field()
-    location: dict[str, list[float]] = Field()
+    location: dict[str, Union[str, list[float]]] = Field()
     services: list[str] = Field()
