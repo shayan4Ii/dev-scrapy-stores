@@ -1,12 +1,12 @@
 import scrapy
-from typing import Dict, Iterator, List
+from typing import Dict, Iterator, List, Any
 import json
 from datetime import datetime
 
 class WalmartSpider(scrapy.Spider):
-    name = "walmart"
-    allowed_domains = ["www.walmart.com"]
-    start_urls = ["https://www.walmart.com/store-directory"]
+    name: str = "walmart"
+    allowed_domains: List[str] = ["www.walmart.com"]
+    start_urls: List[str] = ["https://www.walmart.com/store-directory"]
 
     @staticmethod
     def get_default_headers() -> Dict[str, str]:
@@ -24,8 +24,8 @@ class WalmartSpider(scrapy.Spider):
         for url in self.start_urls:
             yield scrapy.Request(url=url, headers=self.get_default_headers(), callback=self.parse_store_directory)
 
-    def extract_store_ids(self, stores_by_location: Dict) -> List[str]:
-        store_ids = []
+    def extract_store_ids(self, stores_by_location: Dict[str, List[Dict[str, Any]]]) -> List[str]:
+        store_ids: List[str] = []
 
         for state, cities in stores_by_location.items():
             for city_data in cities:
@@ -37,33 +37,33 @@ class WalmartSpider(scrapy.Spider):
                 for store in stores:
                     store_id = store.get('storeId') or store.get('storeid')
                     if store_id:
-                        store_ids.append(store_id)
+                        store_ids.append(str(store_id))
                     else:
                         self.logger.warning(f"No store ID found for store in state {state}: {store}")
 
         return store_ids
 
-    def parse_store_directory(self, response):
+    def parse_store_directory(self, response: scrapy.http.Response) -> Iterator[scrapy.Request]:
         script_content = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
-        json_data = json.loads(script_content)
+        json_data: Dict[str, Any] = json.loads(script_content)
 
-        stores_by_location_json = json_data["props"]["pageProps"]["bootstrapData"]["cv"]["storepages"]["_all_"]["sdStoresPerCityPerState"]
-        stores_by_location = json.loads(stores_by_location_json.strip('"'))
+        stores_by_location_json: str = json_data["props"]["pageProps"]["bootstrapData"]["cv"]["storepages"]["_all_"]["sdStoresPerCityPerState"]
+        stores_by_location: Dict[str, List[Dict[str, Any]]] = json.loads(stores_by_location_json.strip('"'))
 
-        store_ids = self.extract_store_ids(stores_by_location)
+        store_ids: List[str] = self.extract_store_ids(stores_by_location)
         self.logger.info(f"Found {len(store_ids)} store IDs")
 
         for store_id in store_ids:
             store_url = f"https://www.walmart.com/store/{store_id}"
             yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
 
-    def parse_store(self, response):
+    def parse_store(self, response: scrapy.http.Response) -> Dict[str, Any]:
         script_content = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
         
-        json_data = json.loads(script_content)
-        store_data = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
+        json_data: Dict[str, Any] = json.loads(script_content)
+        store_data: Dict[str, Any] = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
 
-        store_item = {
+        store_item: Dict[str, Any] = {
             'name': store_data['displayName'],
             'address': self.format_address(store_data['address']),
             'city': store_data['address']['city'],
@@ -81,7 +81,7 @@ class WalmartSpider(scrapy.Spider):
         return f"{address['addressLineOne']}, {address['city']}, {address['state']} {address['postalCode']}"
 
     def format_hours(self, operational_hours: List[Dict[str, str]]) -> Dict[str, Dict[str, str]]:
-        formatted_hours = {}
+        formatted_hours: Dict[str, Dict[str, str]] = {}
         for day_hours in operational_hours:
             formatted_hours[day_hours['day']] = {
                 "open": self.convert_to_12h_format(day_hours['start']),
