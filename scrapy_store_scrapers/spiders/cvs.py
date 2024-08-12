@@ -16,6 +16,7 @@ class CvsSpider(scrapy.Spider):
             state = city_data['state']
             cbsa = city_data['cbsa']
             for zipcode in city_data['zip_codes']:
+                self.logger.info(f"Fetching stores in {city}, {state}, {zipcode}")
                 url = f"https://www.cvs.com/api/locator/v2/stores/search?searchBy=USER-TEXT&latitude=&longitude=&searchText={zipcode}&searchRadiusInMiles=&maxItemsInResult=&filters=&resultsPerPage=5&pageNum=1"
                 yield scrapy.Request(
                     url,
@@ -29,12 +30,15 @@ class CvsSpider(scrapy.Spider):
                         'page': 1
                     }
                 )
+                break
+            break
 
     def parse(self, response):
         # Parse the JSON response
         data = json.loads(response.text)
         
         # Yield each store from storeList as it is
+        self.logger.info(f"Found {len(data.get('storeList', []))} stores in {response.meta['city']}, {response.meta['state']}, {response.meta['zipcode']}")
         for store in data.get('storeList', []):
             yield {
                 'city': response.meta['city'],
@@ -50,6 +54,7 @@ class CvsSpider(scrapy.Spider):
         results_per_page = 5  # As per the API request
 
         if total_results > current_page * results_per_page:
+            self.logger.info(f"Found more than {current_page * results_per_page} stores in {response.meta['city']}, {response.meta['state']}, {response.meta['zipcode']}. Fetching next page...")
             next_page = current_page + 1
             next_url = response.url.replace(f"pageNum={current_page}", f"pageNum={next_page}")
             yield scrapy.Request(
