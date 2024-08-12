@@ -5,8 +5,9 @@ from datetime import datetime
 import time
 from urllib.parse import urljoin
 from collections import deque
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import logging
+from scrapy_store_scrapers.items import WalmartStoreItem
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -34,6 +35,34 @@ class WalmartScraper:
         self.visited_urls = set()
         self.store_urls = set()
         self.scraped_stores_data = []
+
+    @staticmethod
+    def extract_geo_info(geo_info: Dict[str, float]) -> tuple:
+        """Extract latitude and longitude from geo info."""
+        return geo_info['latitude'], geo_info['longitude']
+
+    @staticmethod
+    def format_address(address: Dict[str, str]) -> str:
+        """Format the store address."""
+        return f"{address['addressLineOne']}, {address['city']}, {address['state']} {address['postalCode']}"
+
+    def format_hours(self, operational_hours: List[Dict[str, str]]) -> Dict[str, Dict[str, str]]:
+        """Format the store operational hours."""
+        formatted_hours = {}
+        for day_hours in operational_hours:
+            formatted_hours[day_hours['day'].lower()] = {
+                "open": self.convert_to_12h_format(day_hours['start']),
+                "close": self.convert_to_12h_format(day_hours['end'])
+            }
+        return formatted_hours
+
+    @staticmethod
+    def convert_to_12h_format(time_str: str) -> str:
+        """Convert 24-hour time format to 12-hour format."""
+        if not time_str:
+            return time_str
+        time_obj = datetime.strptime(time_str, '%H:%M').time()
+        return time_obj.strftime('%I:%M %p').lower()
 
     def get_page(self, url: str) -> Optional[Selector]:
         try:
@@ -119,30 +148,22 @@ class WalmartScraper:
         with open(save_path, 'w') as f:
             json.dump(store_data, f, indent=2)
 
-    def _format_store_output(self, store_data: dict, store_url: str):
-        formatted_output = {
-            "name": store_data['displayName'],
-            "address": self._format_address(store_data['address']),
-            "city": store_data['address']['city'],
-            "state": store_data['address']['state'],
-            "phone_number": store_data['phoneNumber'],
-            "Hours": self._format_hours(store_data['operationalHours']),
-            "services": [service['displayName'] for service in store_data['services']],
-            "url": store_url
-        }
-        return formatted_output
+    def _format_store_output(self, store_data: dict, store_url: str) -> WalmartStoreItem:
+        store_latitude, store_longitude = self.extract_geo_info(store_data['geoPoint'])
+        
+        return WalmartStoreItem(
+            name=store_data['displayName'],
+            number=int(store_data['id']),
+            address=self.format_address(store_data['address']),
+            phone_number=store_data['phoneNumber'],
+            hours=self.format_hours(store_data['operationalHours']),
+            location={
+                "type": "Point",
+                "coordinates": [store_longitude, store_latitude]
+            },
+            services=[service['displayName'] for service in store_data['services']],
+        )
 
-    def _format_address(self, address: dict):
-        return f"{address['addressLineOne']}, {address['city']}, {address['state']} {address['postalCode']}"
-
-    def _format_hours(self, operational_hours: list):
-        formatted_hours = {}
-        for day in operational_hours:
-            formatted_hours[day['day']] = {
-                "open": convert_to_12h_format(day['start']),
-                "close": convert_to_12h_format(day['end'])
-            }
-        return formatted_hours
 
     def run(self):
         logger.info("Starting Walmart scraper")
@@ -164,7 +185,7 @@ class WalmartScraper:
     def save_data(self, filename: str):
         logger.info(f"Saving scraped data to {filename}")
         with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(self.scraped_stores_data, f, indent=2)
+            json.dump([dict(item) for item in self.scraped_stores_data], f, indent=2)
         logger.info(f"Data successfully saved to {filename}")
 
 def main():
