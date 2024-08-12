@@ -75,4 +75,46 @@ class WalmartSpider(scrapy.Spider):
             yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
 
     def parse_store(self, response):
-        pass
+        script_text = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
+        if not script_text:
+            self.logger.error(f"No script data found for {response.url}")
+            return
+
+        try:
+            json_data = json.loads(script_text)
+            store_data = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
+
+            item = {
+                'name': store_data['displayName'],
+                'address': self.format_address(store_data['address']),
+                'city': store_data['address']['city'],
+                'state': store_data['address']['state'],
+                'phone_number': store_data['phoneNumber'],
+                'hours': self.format_hours(store_data['operationalHours']),
+                'services': [service['displayName'] for service in store_data['services']],
+                'url': response.url
+            }
+
+            yield item
+
+        except json.JSONDecodeError:
+            self.logger.error(f"Failed to parse JSON data for {response.url}")
+        except KeyError as e:
+            self.logger.error(f"KeyError while parsing store data for {response.url}: {str(e)}")
+
+    def format_address(self, address):
+        return f"{address['addressLineOne']}, {address['city']}, {address['state']} {address['postalCode']}"
+
+    def format_hours(self, operational_hours):
+        formatted_hours = {}
+        for day in operational_hours:
+            formatted_hours[day['day']] = {
+                "open": self.convert_to_12h_format(day['start']),
+                "close": self.convert_to_12h_format(day['end'])
+            }
+        return formatted_hours
+
+    @staticmethod
+    def convert_to_12h_format(time_str):
+        t = datetime.strptime(time_str, '%H:%M').time()
+        return t.strftime('%I:%M %p').lstrip('0')
