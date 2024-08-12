@@ -1,6 +1,7 @@
 import scrapy
 from typing import Dict, Iterator
 import json
+from datetime import datetime
 
 class WalmartSpider(scrapy.Spider):
     name = "walmart"
