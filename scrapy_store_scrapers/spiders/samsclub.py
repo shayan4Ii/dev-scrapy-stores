@@ -19,9 +19,17 @@ class SamsclubSpider(scrapy.Spider):
     def parse(self, response):
         all_clubs = response.json()
 
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.samsclub.com/club-finder',
+            'Upgrade-Insecure-Requests': '1'
+        }
+
         for club in all_clubs:
             club_url = f"https://www.samsclub.com/club/{club['clubId']}"
-            yield response.follow(url=club_url, callback=self.parse_club)
+            yield scrapy.Request(url=club_url, headers=headers, callback=self.parse_club)
             break
             
     def parse_club(self, response):
