@@ -37,8 +37,7 @@ class CvsSpider(scrapy.Spider):
                     url,
                     self.parse,
                     headers=self.get_headers(),
-                    meta={'page': 1, 'zipcode': zipcode, 'retry_count': 0},
-                    errback=self.errback_httpbin,
+                    meta={'page': 1, 'zipcode': zipcode},
                     dont_filter=True
                 )
 
@@ -54,7 +53,7 @@ class CvsSpider(scrapy.Spider):
         stores = data.get('storeList', [])
         self.logger.info(f"Found {len(stores)} stores for zipcode {response.meta['zipcode']}")
         for store in stores:
-            yield self.validate_store(store)
+            yield store
 
         # Check if there are more pages
         total_results = data.get('totalResults', 0)
@@ -68,8 +67,7 @@ class CvsSpider(scrapy.Spider):
                 next_url,
                 self.parse,
                 headers=self.get_headers(),
-                meta={'page': next_page, 'zipcode': response.meta['zipcode'], 'retry_count': 0},
-                errback=self.errback_httpbin,
+                meta={'page': next_page, 'zipcode': response.meta['zipcode']},
                 dont_filter=True
             )
 
