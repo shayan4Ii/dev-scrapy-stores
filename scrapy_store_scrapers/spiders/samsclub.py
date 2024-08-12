@@ -34,7 +34,6 @@ class SamsclubSpider(scrapy.Spider):
         for club in all_clubs:
             club_url = self.CLUB_URL_TEMPLATE.format(club['clubId'])
             yield scrapy.Request(url=club_url, headers=headers, callback=self.parse_club)
-            break
 
     def parse_club(self, response: scrapy.http.Response) -> SamsclubItem:
         """Parse individual club page and create SamsclubItem."""
