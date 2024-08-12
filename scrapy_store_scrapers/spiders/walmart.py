@@ -49,24 +49,10 @@ class WalmartSpider(scrapy.Spider):
     def parse(self, response):
         script_text = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
         json_data = json.loads(script_text)
-        # props.pageProps.bootstrapData.cv.storepages._all_.sdStoresPerCityPerState
+
         stores_per_city = json_data["props"]["pageProps"]["bootstrapData"]["cv"]["storepages"]["_all_"]["sdStoresPerCityPerState"]
 
         stores_per_city_dict = json.loads(stores_per_city.strip('"'))
-
-        # store_ids = []
-
-        # for state, cities in stores_per_city_dict.items():
-        #     for city_data in cities:
-        #         if 'stores' in city_data:
-        #             if not isinstance(city_data['stores'], list):
-        #                 # self.logger.error(f"City data is not a list: {city_data}")
-        #                 continue
-        #             for store in city_data['stores']:
-        #                 store_id = store.get('storeId') or store.get('storeid')
-        #                 store_ids.append(store_id)
-        #         elif 'storeId' in city_data:
-        #             store_ids.append(city_data['storeId'])
 
         store_ids = self.extract_store_ids(stores_per_city_dict)
         self.logger.info(f"Found {len(store_ids)} store IDs")
@@ -74,7 +60,6 @@ class WalmartSpider(scrapy.Spider):
         for store_id in store_ids:
             store_url = f"https://www.walmart.com/store/{store_id}"
             yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
-            break
 
     def parse_store(self, response):
         script_text = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
