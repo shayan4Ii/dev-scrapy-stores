@@ -1,10 +1,6 @@
 import scrapy
 import json
-import os
 from typing import Dict, Any, Iterator
-from scrapy.utils.project import get_project_settings
-from scrapy.exceptions import CloseSpider
-import time
 
 
 class CvsSpider(scrapy.Spider):
@@ -13,8 +9,6 @@ class CvsSpider(scrapy.Spider):
     
     # Constants
     RESULTS_PER_PAGE: int = 5
-    MAX_RETRIES: int = 3
-    RETRY_DELAY: int = 10  # seconds
     API_KEY: str = 'k6DnPo1puMOQmAhSCiRGYvzMYOSFu903'
     
     custom_settings: Dict[str, Any] = {
