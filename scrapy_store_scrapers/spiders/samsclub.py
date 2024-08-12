@@ -17,5 +17,13 @@ class SamsclubSpider(scrapy.Spider):
         yield scrapy.Request(url=url, headers=headers, callback=self.parse)
 
     def parse(self, response):
+        all_clubs = response.json()
+
+        for club in all_clubs:
+            club_url = f"https://www.samsclub.com/club/{club['clubId']}"
+            yield response.follow(url=club_url, callback=self.parse_club)
+            break
+            
+    def parse_club(self, response):
+        print(response.url)
         print(response.text)
-        print(len(response.json()))
