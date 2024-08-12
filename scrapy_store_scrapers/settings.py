@@ -110,14 +110,13 @@ FEED_EXPORT_ENCODING = "utf-8"
 
 # Logging configuration
 import os
-import logging
 from datetime import datetime
 
-# Set up logging to file
+# Set up logging to file (error logs only)
 LOG_FILE = os.path.join('logs', f'error_log_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
 LOG_FILE_LEVEL = 'ERROR'
 
-# Set up logging to console
+# Set up logging to console (debug and above)
 LOG_LEVEL = 'DEBUG'
 LOG_ENABLED = True
 
@@ -125,20 +124,5 @@ LOG_ENABLED = True
 LOG_FORMAT = '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
 LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
 
-# Configure logging for console output
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-console_handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATEFORMAT))
-
-# Configure logging for file output (error logs only)
-file_handler = logging.FileHandler(LOG_FILE)
-file_handler.setLevel(logging.ERROR)
-file_handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATEFORMAT))
-
-# Get the root logger and set its level to DEBUG
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG)
-
-# Add both handlers to the root logger
-root_logger.addHandler(console_handler)
-root_logger.addHandler(file_handler)
+# Configure Scrapy's built-in logging
+LOG_STDOUT = False  # Disable logging to stdout (we'll use a StreamHandler instead)
