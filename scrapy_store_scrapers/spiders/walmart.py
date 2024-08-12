@@ -75,7 +75,8 @@ class WalmartSpider(scrapy.Spider):
             self.logger.info(f"Found {len(store_ids)} store IDs")
 
             for store_id in store_ids:
-                store_url = f"https://www.walmart.com/store/{store_id}"
+                # store_url = f"https://www.walmart.com/store/{store_id}"
+                store_url = f"https://www.walmart.com/store/2070-anchorage-ak"
                 yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store, meta={'store_id': store_id})
         except json.JSONDecodeError as e:
             self.logger.error(f"JSON decode error in parse_store_directory: {str(e)}")
