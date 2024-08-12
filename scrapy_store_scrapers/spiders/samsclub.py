@@ -1,7 +1,7 @@
 import scrapy
 import json
 from datetime import datetime
-from typing import Dict, List, Any, Iterator
+from typing import Iterator
 from scrapy_store_scrapers.items import SamsclubItem
 
 class SamsclubSpider(scrapy.Spider):
