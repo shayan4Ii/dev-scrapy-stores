@@ -9,17 +9,39 @@ class CvsSpider(scrapy.Spider):
     def start_requests(self):
         # Read zipcodes from JSON file
         with open('zipcodes.json', 'r') as f:
-            zipcodes = json.load(f)
+            zipcodes_data = json.load(f)
 
-        for zipcode in zipcodes:
-            url = f"https://www.cvs.com/api/locator/v2/stores/search?searchBy=USER-TEXT&latitude=&longitude=&searchText={zipcode}&searchRadiusInMiles=&maxItemsInResult=&filters=&resultsPerPage=5&pageNum=1"
-            yield scrapy.Request(url, self.parse, headers=self.get_headers())
+        for city_data in zipcodes_data:
+            city = city_data['city']
+            state = city_data['state']
+            cbsa = city_data['cbsa']
+            for zipcode in city_data['zip_codes']:
+                url = f"https://www.cvs.com/api/locator/v2/stores/search?searchBy=USER-TEXT&latitude=&longitude=&searchText={zipcode}&searchRadiusInMiles=&maxItemsInResult=&filters=&resultsPerPage=5&pageNum=1"
+                yield scrapy.Request(
+                    url,
+                    self.parse,
+                    headers=self.get_headers(),
+                    meta={
+                        'city': city,
+                        'state': state,
+                        'cbsa': cbsa,
+                        'zipcode': zipcode
+                    }
+                )
 
     def parse(self, response):
         # Parse the JSON response
         data = json.loads(response.text)
         # Process the data as needed
         # For example, you can yield items or make further requests
+        for store in data.get('stores', []):
+            yield {
+                'city': response.meta['city'],
+                'state': response.meta['state'],
+                'cbsa': response.meta['cbsa'],
+                'zipcode': response.meta['zipcode'],
+                'store_data': store
+            }
 
     @staticmethod
     def get_headers():
