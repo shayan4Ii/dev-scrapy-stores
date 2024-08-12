@@ -37,11 +37,8 @@ class SamsclubSpider(scrapy.Spider):
 
     def parse_club(self, response: scrapy.http.Response) -> SamsclubItem:
         """Parse individual club page and create SamsclubItem."""
-        try:
-            club_data = self.extract_club_data(response)
-            return self.create_club_item(club_data, response)
-        except Exception as e:
-            self.logger.error(f"Error parsing club page {response.url}: {str(e)}")
+        club_data = self.extract_club_data(response)
+        return self.create_club_item(club_data, response)
 
     def extract_club_data(self, response: scrapy.http.Response) -> Dict[str, Any]:
         """Extract club data from the response."""
