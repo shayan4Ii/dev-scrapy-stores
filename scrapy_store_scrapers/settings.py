@@ -107,3 +107,11 @@ USER_AGENTS = [
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
+
+# Logging configuration
+import os
+from datetime import datetime
+
+LOG_LEVEL = 'ERROR'
+LOG_FILE = os.path.join('logs', f'error_log_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+LOG_ENABLED = True
