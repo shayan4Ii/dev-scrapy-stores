@@ -74,8 +74,6 @@ class WalmartSpider(scrapy.Spider):
         
         json_data = json.loads(script_content)
         store_data = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
-        import pyperclip
-        pyperclip.copy(json.dumps(store_data))
 
         store_latitude, store_longitude = self.extract_geo_info(store_data['geoPoint'])
 
