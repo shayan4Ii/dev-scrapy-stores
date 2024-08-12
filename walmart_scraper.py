@@ -83,41 +83,57 @@ class WalmartScraper:
         return [urljoin(base_url, url) for url in urls]
 
     def scrape_store_urls(self):
-        urls_to_visit = deque([self.start_url])
         logger.info(f"Starting to scrape store URLs from {self.start_url}")
+        selector = self.get_page(self.start_url)
+        if selector is None:
+            logger.error("Failed to get the store directory page")
+            return
 
-        while urls_to_visit:
-            current_url = urls_to_visit.popleft()
+        try:
+            script_content = selector.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
+            if not script_content:
+                raise ValueError("Script content not found")
             
-            if current_url in self.visited_urls:
-                logger.debug(f"Skipping already visited URL: {current_url}")
-                continue
-            
-            self.visited_urls.add(current_url)
-            logger.info(f"Processing URL: {current_url}")
-            selector = self.get_page(current_url)
-            
-            if selector is None:
-                logger.warning(f"Failed to get page for URL: {current_url}")
-                continue
-            
-            self._process_urls(selector, current_url, urls_to_visit)
-            
-            time.sleep(1)  # Be respectful to the server
-        
+            json_data = json.loads(script_content)
+
+            stores_by_location_json = json_data["props"]["pageProps"]["bootstrapData"]["cv"]["storepages"]["_all_"]["sdStoresPerCityPerState"]
+            stores_by_location = json.loads(stores_by_location_json.strip('"'))
+
+            store_ids = self.extract_store_ids(stores_by_location)
+            logger.info(f"Found {len(store_ids)} store IDs")
+
+            for store_id in store_ids:
+                store_url = f"https://www.walmart.com/store/{store_id}"
+                self.store_urls.add(store_url)
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in scrape_store_urls: {str(e)}")
+        except KeyError as e:
+            logger.error(f"Key error in scrape_store_urls: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error in scrape_store_urls: {str(e)}")
+
         logger.info(f"Finished scraping store URLs. Total URLs found: {len(self.store_urls)}")
 
-    def _process_urls(self, selector: Selector, base_url: str, urls_to_visit: deque):
-        urls = self.get_urls(selector, base_url)
-        logger.debug(f"Found {len(urls)} URLs on page {base_url}")
-        
-        for url in urls:
-            if self.is_store_directory(url) and url not in self.visited_urls:
-                logger.debug(f"Adding store directory URL to visit: {url}")
-                urls_to_visit.append(url)
-            elif not self.is_store_directory(url):
-                logger.debug(f"Adding store URL: {url}")
-                self.store_urls.add(url)
+    def extract_store_ids(self, stores_by_location: Dict[str, List[Dict[str, Any]]]) -> List[str]:
+        """Extract store IDs from the stores by location data."""
+        store_ids = []
+
+        for state, cities in stores_by_location.items():
+            for city_data in cities:
+                stores = city_data.get('stores', [city_data])
+                if not isinstance(stores, list):
+                    logger.error(f"Stores data is not a list for city in state {state}: {city_data}")
+                    continue
+
+                for store in stores:
+                    store_id = store.get('storeId') or store.get('storeid')
+                    if store_id:
+                        store_ids.append(str(store_id))
+                    else:
+                        logger.warning(f"No store ID found for store in state {state}: {store}")
+
+        return store_ids
 
     def scrape_store_details(self, store_url: str):
         logger.info(f"Scraping store details from: {store_url}")
