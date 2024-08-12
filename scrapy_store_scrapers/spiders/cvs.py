@@ -8,12 +8,12 @@ class CvsSpider(scrapy.Spider):
     allowed_domains: list[str] = ["www.cvs.com"]
     
     # Constants
-    RESULTS_PER_PAGE: int = 5
+    RESULTS_PER_PAGE: int = 25
     API_KEY: str = 'k6DnPo1puMOQmAhSCiRGYvzMYOSFu903'
     
     custom_settings: Dict[str, Any] = {
-        'CONCURRENT_REQUESTS': 16,
-        'DOWNLOAD_DELAY': 1,
+        'CONCURRENT_REQUESTS': 32,
+        # 'DOWNLOAD_DELAY': 1,
     }
 
     def start_requests(self) -> Iterator[scrapy.Request]:
