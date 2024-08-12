@@ -66,6 +66,7 @@ class WalmartSpider(scrapy.Spider):
         for store_id in store_ids:
             store_url = f"https://www.walmart.com/store/{store_id}"
             yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
+            break
 
     def parse_store(self, response: scrapy.http.Response) -> WalmartStoreItem:
         """Parse individual store page and extract store information."""
@@ -74,17 +75,22 @@ class WalmartSpider(scrapy.Spider):
         
         json_data = json.loads(script_content)
         store_data = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
+        import pyperclip
+        pyperclip.copy(json.dumps(store_data))
+
+        store_latitude, store_longitude = self.extract_geo_info(store_data['geoPoint'])
 
         # Create and return WalmartStoreItem
         store_item = WalmartStoreItem(
             name=store_data['displayName'],
             address=self.format_address(store_data['address']),
-            city=store_data['address']['city'],
-            state=store_data['address']['state'],
             phone_number=store_data['phoneNumber'],
             hours=self.format_hours(store_data['operationalHours']),
+            location={
+                "type": "Point",
+                "coordinates": [store_longitude, store_latitude]
+            },
             services=[service['displayName'] for service in store_data['services']],
-            url=response.url
         )
 
         return store_item
@@ -93,6 +99,11 @@ class WalmartSpider(scrapy.Spider):
     def format_address(address: Dict[str, str]) -> str:
         """Format the store address."""
         return f"{address['addressLineOne']}, {address['city']}, {address['state']} {address['postalCode']}"
+
+    @staticmethod
+    def extract_geo_info(geo_info: Dict[str, float]) -> tuple:
+        """Extract latitude and longitude from geo info."""
+        return geo_info['latitude'], geo_info['longitude']
 
     def format_hours(self, operational_hours: List[Dict[str, str]]) -> Dict[str, Dict[str, str]]:
         """Format the store operational hours."""

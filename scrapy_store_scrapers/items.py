@@ -21,9 +21,7 @@ class SamsclubItem(Item):
 class WalmartStoreItem(Item):
     name: str = Field()
     address: str = Field()
-    city: str = Field()
-    state: str = Field()
     phone_number: str = Field()
     hours: Dict[str, Dict[str, str]] = Field()
+    location: Dict[str, Union[str, List[float]]] = Field()
     services: List[str] = Field()
-    url: str = Field()
