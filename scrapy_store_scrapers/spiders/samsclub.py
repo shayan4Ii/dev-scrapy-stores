@@ -92,8 +92,11 @@ class SamsclubSpider(scrapy.Spider):
                 day = rename_dict[day]
                 club_hours[day] = hours_dict
 
-        # sort club from monday to sunday
-        club_hours = dict(sorted(club_hours.items(), key=lambda x: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].index(x[0])))
+        # Define the correct order of days
+        day_order = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        
+        # Sort club hours based on the defined order
+        club_hours = {day: club_hours[day] for day in day_order if day in club_hours}
         
         services = response.xpath('//div[@class="bst-accordion-item-title"]/text()').getall()
         return {
