@@ -14,5 +14,6 @@ class SamsclubItem(Item):
     name: str = Field()
     address: str = Field()
     phone: str = Field()
-    
+    hours: dict[str, dict[str, str]] = Field()
+    location: dict[str, list[float]] = Field()
     services: list[str] = Field()
