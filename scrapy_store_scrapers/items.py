@@ -1,5 +1,5 @@
 from scrapy import Item, Field
-from typing import Optional, Union
+from typing import Union
 
 
 class AlbertsonsStoreItem(Item):
