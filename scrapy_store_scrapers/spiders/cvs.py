@@ -1,6 +1,6 @@
 import scrapy
 import json
-from typing import Dict, Any, Iterator
+from typing import Dict, Any, Iterator, Set
 
 
 class CvsSpider(scrapy.Spider):
@@ -15,6 +15,10 @@ class CvsSpider(scrapy.Spider):
         'CONCURRENT_REQUESTS': 32,
         # 'DOWNLOAD_DELAY': 1,
     }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.processed_store_ids: Set[str] = set()
 
     def start_requests(self) -> Iterator[scrapy.Request]:
         """Generate initial requests for each zipcode."""
@@ -44,11 +48,14 @@ class CvsSpider(scrapy.Spider):
             self.logger.error(f"Failed to parse JSON from {response.url}")
             return
 
-        # Yield each store from storeList as it is
+        # Process each store from storeList
         stores = data.get('storeList', [])
         self.logger.info(f"Found {len(stores)} stores for zipcode {response.meta['zipcode']}")
         for store in stores:
-            yield store
+            store_id = store.get('storeInfo', {}).get('storeId')
+            if store_id and store_id not in self.processed_store_ids:
+                self.processed_store_ids.add(store_id)
+                yield store
 
         # Check if there are more pages
         total_results = data.get('totalResults', 0)
