@@ -29,7 +29,6 @@ class CvsSpider(scrapy.Spider):
         for city_data in zipcodes_data:
             city = city_data['city']
             state = city_data['state']
-            cbsa = city_data['cbsa']
             for zipcode in city_data['zip_codes']:
                 self.logger.info(f"Fetching stores in {city}, {state}, {zipcode}")
                 url = f"https://www.cvs.com/api/locator/v2/stores/search?searchBy=USER-TEXT&latitude=&longitude=&searchText={zipcode}&searchRadiusInMiles=&maxItemsInResult=&filters=&resultsPerPage={self.RESULTS_PER_PAGE}&pageNum=1"
