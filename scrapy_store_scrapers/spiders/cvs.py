@@ -45,25 +45,25 @@ class CvsSpider(scrapy.Spider):
     def parse(self, response: scrapy.http.Response) -> Iterator[Dict[str, Any]]:
         """Parse the JSON response and yield store data."""
         try:
-            data: Dict[str, Any] = json.loads(response.text)
+            data = json.loads(response.text)
         except json.JSONDecodeError:
             self.logger.error(f"Failed to parse JSON from {response.url}")
             return
 
         # Yield each store from storeList as it is
-        stores: list[Dict[str, Any]] = data.get('storeList', [])
+        stores = data.get('storeList', [])
         self.logger.info(f"Found {len(stores)} stores for zipcode {response.meta['zipcode']}")
         for store in stores:
             yield store
 
         # Check if there are more pages
-        total_results: int = data.get('totalResults', 0)
-        current_page: int = response.meta['page']
+        total_results = data.get('totalResults', 0)
+        current_page = response.meta['page']
 
         if total_results > current_page * self.RESULTS_PER_PAGE:
             self.logger.info(f"Found more than {current_page * self.RESULTS_PER_PAGE} stores. Fetching next page...")
-            next_page: int = current_page + 1
-            next_url: str = response.url.replace(f"pageNum={current_page}", f"pageNum={next_page}")
+            next_page = current_page + 1
+            next_url = response.url.replace(f"pageNum={current_page}", f"pageNum={next_page}")
             yield scrapy.Request(
                 next_url,
                 self.parse,
