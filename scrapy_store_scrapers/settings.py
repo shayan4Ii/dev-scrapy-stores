@@ -112,12 +112,12 @@ FEED_EXPORT_ENCODING = "utf-8"
 import os
 from datetime import datetime
 
-# Set up logging to file (error logs only)
-LOG_FILE = os.path.join('logs', f'error_log_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
-LOG_FILE_LEVEL = 'ERROR'
+# Set up logging to file (INFO logs and above)
+LOG_FILE = os.path.join('logs', f'scrapy_log_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+LOG_FILE_LEVEL = 'INFO'
 
-# Set up logging to console (debug and above)
-LOG_LEVEL = 'DEBUG'
+# Set up logging to console (INFO and above)
+LOG_LEVEL = 'INFO'
 LOG_ENABLED = True
 
 # Custom logging settings
