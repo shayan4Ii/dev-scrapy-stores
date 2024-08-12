@@ -1,26 +1,37 @@
-Hi Jimmy,
+# AI System Instructions
 
-I'm pleased to inform you that I've completed the Sam's Club web scraper project as requested. I'm sending you the following for your review:
+1. Review the web scraper code:
+   - Examine the file `scrapy_store_scrapers\spiders\samsclub.py`
+   - Analyze the scraper's functionality, efficiency, and adherence to best practices
 
-1. JSON data extracted by the scraper
-2. Project code (as a zip file)
+2. Prepare a message for Jimmy:
+   - Create a new file named `delivery_message.md`
+   - Write a professional message following this structure:
+     a. Greeting and introduction stating task completion
+     b. Key points in a numbered list:
+        1. Task Completed: Brief description of the implemented scraper
+        2. Main File: Specify the location of the core implementation file
+        3. Functionality: Bullet points describing what the scraper does
+        4. Code Structure: Bullet points outlining the technical aspects
+     c. Mention the attached JSON file with extracted data and ZIP file with the project
+     d. Request for review, focusing on the main spider file
+     e. Ask for feedback and suggestions for improvements
+     f. Add a P.S. note about the contents of the ZIP file
 
-The main file to review is `scrapy_store_scrapers\spiders\samsclub.py`. This file contains the core functionality of the scraper.
+3. Content specifics:
+   - Replace "Albertsons" with "Sam's Club" throughout the message
+   - Update file paths and website references accordingly
+   - Adjust the functionality and code structure details to match the Sam's Club scraper
 
-Notable features and challenges:
-1. Implemented efficient data extraction using Scrapy's asynchronous capabilities.
-2. Handled complex JSON parsing from embedded script tags.
-3. Implemented robust error handling and logging for better maintainability.
-4. Formatted data (e.g., phone numbers, addresses, hours) for consistency and readability.
-5. Extracted additional services information from the club pages.
+4. Formatting:
+   - Use Markdown formatting for headings, lists, and emphasis
+   - Ensure proper indentation for nested lists
 
-To run the scraper:
-1. Navigate to the project directory
-2. Run `scrapy crawl samsclub`
+5. Signature:
+   - Sign the message with the name "Umar Farooq"
 
-I'd appreciate your feedback on the implementation, particularly regarding code structure and efficiency. If you need any changes or have additional requirements, please let me know.
+6. Output:
+   - Provide the contents of the `delivery_message.md` file
+   - Offer any suggestions for improving the message or the overall communication process
 
-Thank you for your time. I'm looking forward to your review and any further instructions you might have.
-
-Best regards,
-Umar Farooq
+Please execute these instructions and present the resulting message for review.
