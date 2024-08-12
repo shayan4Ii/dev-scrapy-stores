@@ -15,10 +15,6 @@ class SamsclubSpider(scrapy.Spider):
     CLUB_FINDER_URL = "https://www.samsclub.com/api/node/vivaldi/browse/v2/clubfinder/search?isActive=true"
     CLUB_URL_TEMPLATE = "https://www.samsclub.com/club/{}"
 
-    def __init__(self, *args, **kwargs):
-        super(SamsclubSpider, self).__init__(*args, **kwargs)
-        self.logger = logging.getLogger(self.name)
-
     def start_requests(self) -> Iterator[scrapy.Request]:
         """Initiate the scraping process."""
         headers = self.get_default_headers()
@@ -37,6 +33,7 @@ class SamsclubSpider(scrapy.Spider):
         for club in all_clubs:
             club_url = self.CLUB_URL_TEMPLATE.format(club['clubId'])
             yield scrapy.Request(url=club_url, headers=headers, callback=self.parse_club)
+            break
 
     def parse_club(self, response: scrapy.http.Response) -> SamsclubItem:
         """Parse individual club page and create SamsclubItem."""
