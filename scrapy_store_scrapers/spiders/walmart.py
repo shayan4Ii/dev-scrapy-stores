@@ -112,14 +112,13 @@ class WalmartSpider(scrapy.Spider):
                 services=[service['displayName'] for service in store_data['services']],
             )
 
-            yield store_item
+            return store_item
         except json.JSONDecodeError as e:
             self.logger.error(f"JSON decode error in parse_store for {response.url}: {str(e)}")
         except KeyError as e:
             self.logger.error(f"Key error in parse_store for {response.url}: {str(e)}")
         except Exception as e:
             self.logger.error(f"Unexpected error in parse_store for {response.url}: {str(e)}")
-            yield scrapy.Request(url=response.url, headers=self.get_default_headers(), callback=self.parse_store, dont_filter=True, meta={'store_id': response.meta.get('store_id')})
 
     @staticmethod
     def format_address(address: Dict[str, str]) -> str:
