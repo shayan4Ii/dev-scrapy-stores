@@ -14,6 +14,7 @@ class CvsSpider(scrapy.Spider):
     RESULTS_PER_PAGE = 5
     MAX_RETRIES = 3
     RETRY_DELAY = 10  # seconds
+    API_KEY = 'k6DnPo1puMOQmAhSCiRGYvzMYOSFu903'
     
     custom_settings = {
         'CONCURRENT_REQUESTS': 16,
@@ -40,19 +41,6 @@ class CvsSpider(scrapy.Spider):
                     errback=self.errback_httpbin,
                     dont_filter=True
                 )
-
-    def errback_httpbin(self, failure):
-        """Handle request failures."""
-        request = failure.request
-        if request.meta['retry_count'] < self.MAX_RETRIES:
-            self.logger.warning(f"Retrying {request.url}, attempt {request.meta['retry_count'] + 1}")
-            time.sleep(self.RETRY_DELAY)
-            return request.replace(
-                meta={'retry_count': request.meta['retry_count'] + 1},
-                dont_filter=True
-            )
-        else:
-            self.logger.error(f"Failed to scrape {request.url} after {self.MAX_RETRIES} attempts")
 
     def parse(self, response):
         """Parse the JSON response and yield store data."""
@@ -85,11 +73,6 @@ class CvsSpider(scrapy.Spider):
                 dont_filter=True
             )
 
-    def validate_store(self, store):
-        """Validate and clean store data."""
-        # Add validation logic here
-        return store
-
     @staticmethod
     def get_headers():
         """Get headers for the API request."""
@@ -104,11 +87,7 @@ class CvsSpider(scrapy.Spider):
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
-            "x-api-key": os.getenv('CVS_API_KEY', 'k6DnPo1puMOQmAhSCiRGYvzMYOSFu903'),
+            "x-api-key": CvsSpider.API_KEY,
             "Referer": "https://www.cvs.com/store-locator/landing",
             "Referrer-Policy": "origin-when-cross-origin"
         }
-
-    def closed(self, reason):
-        """Called when spider is closed."""
-        self.logger.info(f"Spider closed: {reason}")
