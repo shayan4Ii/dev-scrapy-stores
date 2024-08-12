@@ -1,5 +1,6 @@
 import scrapy
 import json
+import re
 from datetime import datetime
 from typing import Iterator, Dict, Any, List
 from scrapy_store_scrapers.items import SamsclubItem
@@ -53,7 +54,7 @@ class SamsclubSpider(scrapy.Spider):
         """Create a SamsclubItem from the extracted club data."""
         club_id = club_data['id']
         club_name = club_data['name']
-        club_phone = club_data['phone']
+        club_phone = self.format_phone(club_data['phone'])
         club_full_address = self.format_address(club_data['address'])
         club_latitude, club_longitude = self.extract_geo_info(club_data['geoPoint'])
         club_hours = self.format_hours(club_data['operationalHours'])
@@ -70,6 +71,14 @@ class SamsclubSpider(scrapy.Spider):
             },
             services=services
         )
+
+    @staticmethod
+    def format_phone(phone: str) -> str:
+        """Format the phone number to (XXX) XXX-XXXX."""
+        digits = re.sub(r'\D', '', phone)
+        if len(digits) == 10:
+            return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+        return phone  # Return original if not 10 digits
 
     @staticmethod
     def format_address(address: Dict[str, str]) -> str:
