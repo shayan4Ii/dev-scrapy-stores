@@ -1,6 +1,7 @@
 import scrapy
 import json
 from datetime import datetime
+from scrapy_store_scrapers.items import SamsclubItem
 
 class SamsclubSpider(scrapy.Spider):
     name = "samsclub"
@@ -99,20 +100,23 @@ class SamsclubSpider(scrapy.Spider):
         club_hours = {day: club_hours[day] for day in day_order if day in club_hours}
         
         services = response.xpath('//div[@class="bst-accordion-item-title"]/text()').getall()
-        return {
-            "name": f"{club_name} #{club_id}",
-            "address": club_full_address,
-            "phone": club_phone,
-            "hours": club_hours,
-            "location":{
-                "type":"Point",
-                "coordinates":[
-                club_longitude,
-                club_latitude
+        
+        item = SamsclubItem(
+            name=f"{club_name} #{club_id}",
+            address=club_full_address,
+            phone=club_phone,
+            hours=club_hours,
+            location={
+                "type": "Point",
+                "coordinates": [
+                    club_longitude,
+                    club_latitude
                 ]
             },
-            "services": services,
-        }
+            services=services
+        )
+        
+        return item
 
 
         
