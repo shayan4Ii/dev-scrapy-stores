@@ -75,7 +75,7 @@ class WalmartSpider(scrapy.Spider):
             url=response.url
         )
 
-        yield store_item
+        return store_item
 
     @staticmethod
     def format_address(address: Dict[str, str]) -> str:
