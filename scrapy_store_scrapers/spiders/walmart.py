@@ -74,35 +74,28 @@ class WalmartSpider(scrapy.Spider):
         for store_id in store_ids:
             store_url = f"https://www.walmart.com/store/{store_id}"
             yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
+            break
 
     def parse_store(self, response):
         script_text = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
-        if not script_text:
-            self.logger.error(f"No script data found for {response.url}")
-            return
+        
+        json_data = json.loads(script_text)
+        store_data = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
 
-        try:
-            json_data = json.loads(script_text)
-            store_data = json_data['props']['pageProps']['initialData']['initialDataNodeDetail']['data']['nodeDetail']
+        item = {
+            'name': store_data['displayName'],
+            'address': self.format_address(store_data['address']),
+            'city': store_data['address']['city'],
+            'state': store_data['address']['state'],
+            'phone_number': store_data['phoneNumber'],
+            'hours': self.format_hours(store_data['operationalHours']),
+            'services': [service['displayName'] for service in store_data['services']],
+            'url': response.url
+        }
 
-            item = {
-                'name': store_data['displayName'],
-                'address': self.format_address(store_data['address']),
-                'city': store_data['address']['city'],
-                'state': store_data['address']['state'],
-                'phone_number': store_data['phoneNumber'],
-                'hours': self.format_hours(store_data['operationalHours']),
-                'services': [service['displayName'] for service in store_data['services']],
-                'url': response.url
-            }
+        yield item
 
-            yield item
-
-        except json.JSONDecodeError:
-            self.logger.error(f"Failed to parse JSON data for {response.url}")
-        except KeyError as e:
-            self.logger.error(f"KeyError while parsing store data for {response.url}: {str(e)}")
-
+        
     def format_address(self, address):
         return f"{address['addressLineOne']}, {address['city']}, {address['state']} {address['postalCode']}"
 
@@ -118,4 +111,4 @@ class WalmartSpider(scrapy.Spider):
     @staticmethod
     def convert_to_12h_format(time_str):
         t = datetime.strptime(time_str, '%H:%M').time()
-        return t.strftime('%I:%M %p').lstrip('0')
+        return t.strftime('%I:%M %p').lower()
