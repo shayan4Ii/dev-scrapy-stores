@@ -116,5 +116,11 @@ class WalmartSpider(scrapy.Spider):
     @staticmethod
     def convert_to_12h_format(time_str: str) -> str:
         """Convert 24-hour time format to 12-hour format."""
+        if not time_str:
+            return time_str
         time_obj = datetime.strptime(time_str, '%H:%M').time()
         return time_obj.strftime('%I:%M %p').lower()
+
+# https://www.walmart.com/store/5697-undefined-undefined
+# https://www.walmart.com/store/2936-undefined-undefined
+# 
