@@ -22,13 +22,7 @@ class CvsSpider(scrapy.Spider):
                     url,
                     self.parse,
                     headers=self.get_headers(),
-                    meta={
-                        'city': city,
-                        'state': state,
-                        'cbsa': cbsa,
-                        'zipcode': zipcode,
-                        'page': 1
-                    }
+                    meta={'page': 1}
                 )
                 break
             break
@@ -38,7 +32,7 @@ class CvsSpider(scrapy.Spider):
         data = json.loads(response.text)
         
         # Yield each store from storeList as it is
-        self.logger.info(f"Found {len(data.get('storeList', []))} stores in {response.meta['city']}, {response.meta['state']}, {response.meta['zipcode']}")
+        self.logger.info(f"Found {len(data.get('storeList', []))} stores")
         for store in data.get('storeList', []):
             yield store
 
@@ -48,20 +42,14 @@ class CvsSpider(scrapy.Spider):
         results_per_page = 5  # As per the API request
 
         if total_results > current_page * results_per_page:
-            self.logger.info(f"Found more than {current_page * results_per_page} stores in {response.meta['city']}, {response.meta['state']}, {response.meta['zipcode']}. Fetching next page...")
+            self.logger.info(f"Found more than {current_page * results_per_page} stores. Fetching next page...")
             next_page = current_page + 1
             next_url = response.url.replace(f"pageNum={current_page}", f"pageNum={next_page}")
             yield scrapy.Request(
                 next_url,
                 self.parse,
                 headers=self.get_headers(),
-                meta={
-                    'city': response.meta['city'],
-                    'state': response.meta['state'],
-                    'cbsa': response.meta['cbsa'],
-                    'zipcode': response.meta['zipcode'],
-                    'page': next_page
-                }
+                meta={'page': next_page}
             )
 
     @staticmethod
