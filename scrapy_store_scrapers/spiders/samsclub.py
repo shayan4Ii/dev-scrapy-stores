@@ -17,8 +17,7 @@ class SamsclubSpider(scrapy.Spider):
         }
         yield scrapy.Request(url=url, headers=headers, callback=self.parse)
 
-    def parse(self, response):
-        all_clubs = response.json()
+    def parse(self, response: scrapy.http.Response):
 
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -34,11 +33,11 @@ class SamsclubSpider(scrapy.Spider):
             break
 
     @staticmethod
-    def convert_to_12_hour(time_str):
+    def convert_to_12_hour(time_str: str) -> str:
         time_obj = datetime.strptime(time_str, '%H:%M')
         return time_obj.strftime('%I:%M %p').lower()
 
-    def parse_club(self, response):
+    def parse_club(self, response: scrapy.http.Response):
         print(response.url)
         print(response.text)
         script_text = response.xpath('//script[@id="tb-djs-wml-redux-state"]/text()').get()
