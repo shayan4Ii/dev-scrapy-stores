@@ -110,6 +110,7 @@ FEED_EXPORT_ENCODING = "utf-8"
 
 # Logging configuration
 import os
+import logging
 from datetime import datetime
 
 # Set up logging to file (INFO logs and above)
@@ -126,3 +127,10 @@ LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
 
 # Configure Scrapy's built-in logging
 LOG_STDOUT = False  # Disable logging to stdout (we'll use a StreamHandler instead)
+
+# Add a StreamHandler to log to console
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+formatter = logging.Formatter(LOG_FORMAT, LOG_DATEFORMAT)
+console_handler.setFormatter(formatter)
+logging.getLogger().addHandler(console_handler)
