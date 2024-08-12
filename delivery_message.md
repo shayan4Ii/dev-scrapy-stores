@@ -1,4 +1,4 @@
-Hello team,
+Hi Jimmy,
 
 I've completed the task of implementing the SamsClub scraper and making the requested improvements. I'm sending the project code as a zip file for your review.
 
