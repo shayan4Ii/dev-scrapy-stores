@@ -77,7 +77,7 @@ class CvsSpider(scrapy.Spider):
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
-            "x-api-key": "k6DnPo1puMOQmAhSCiRGYvzMYOSFu903",
+            # "x-api-key": "k6DnPo1puMOQmAhSCiRGYvzMYOSFu903",
             "Referer": "https://www.cvs.com/store-locator/landing",
             "Referrer-Policy": "origin-when-cross-origin"
         }
