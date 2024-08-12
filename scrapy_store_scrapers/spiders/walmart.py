@@ -12,6 +12,11 @@ class WalmartSpider(scrapy.Spider):
     allowed_domains: List[str] = ["www.walmart.com"]
     start_urls: List[str] = ["https://www.walmart.com/store-directory"]
 
+    custom_settings = {
+        'DOWNLOAD_DELAY': 2,
+        'CONCURRENT_REQUESTS_PER_DOMAIN': 1,
+    }
+
     @staticmethod
     def get_default_headers() -> Dict[str, str]:
         """Return default headers for requests."""
@@ -71,7 +76,7 @@ class WalmartSpider(scrapy.Spider):
 
             for store_id in store_ids:
                 store_url = f"https://www.walmart.com/store/{store_id}"
-                yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
+                yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store, meta={'store_id': store_id})
         except json.JSONDecodeError as e:
             self.logger.error(f"JSON decode error in parse_store_directory: {str(e)}")
         except KeyError as e:
@@ -106,15 +111,14 @@ class WalmartSpider(scrapy.Spider):
                 services=[service['displayName'] for service in store_data['services']],
             )
 
-            return store_item
+            yield store_item
         except json.JSONDecodeError as e:
             self.logger.error(f"JSON decode error in parse_store for {response.url}: {str(e)}")
         except KeyError as e:
             self.logger.error(f"Key error in parse_store for {response.url}: {str(e)}")
         except Exception as e:
             self.logger.error(f"Unexpected error in parse_store for {response.url}: {str(e)}")
-        
-        raise IgnoreRequest(f"Failed to parse store data for {response.url}")
+            yield scrapy.Request(url=response.url, headers=self.get_default_headers(), callback=self.parse_store, dont_filter=True, meta={'store_id': response.meta.get('store_id')})
 
     @staticmethod
     def format_address(address: Dict[str, str]) -> str:
