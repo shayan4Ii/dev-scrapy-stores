@@ -73,8 +73,7 @@ class CvsSpider(scrapy.Spider):
                 dont_filter=True
             )
 
-    @staticmethod
-    def get_headers():
+    def get_headers(self):
         """Get headers for the API request."""
         return {
             "accept": "*/*",
@@ -87,7 +86,7 @@ class CvsSpider(scrapy.Spider):
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
-            "x-api-key": CvsSpider.API_KEY,
+            "x-api-key": self.API_KEY,
             "Referer": "https://www.cvs.com/store-locator/landing",
             "Referrer-Policy": "origin-when-cross-origin"
         }
