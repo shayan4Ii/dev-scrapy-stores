@@ -40,13 +40,7 @@ class CvsSpider(scrapy.Spider):
         # Yield each store from storeList as it is
         self.logger.info(f"Found {len(data.get('storeList', []))} stores in {response.meta['city']}, {response.meta['state']}, {response.meta['zipcode']}")
         for store in data.get('storeList', []):
-            yield {
-                'city': response.meta['city'],
-                'state': response.meta['state'],
-                'cbsa': response.meta['cbsa'],
-                'zipcode': response.meta['zipcode'],
-                'store': store
-            }
+            yield store
 
         # Check if there are more pages
         total_results = data.get('totalResults', 0)
