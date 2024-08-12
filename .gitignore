@@ -106,3 +106,4 @@ venv.bak/
 # Scrapy specific
 *.jl
 delivery_command.txt
+zip_project.py
