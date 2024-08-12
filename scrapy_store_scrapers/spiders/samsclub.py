@@ -57,7 +57,8 @@ class SamsclubSpider(scrapy.Spider):
         services = self.extract_services(response)
 
         return SamsclubItem(
-            name=f"{club_name} #{club_id}",
+            name=club_name,
+            number=club_id,
             address=club_full_address,
             phone=club_phone,
             hours=club_hours,

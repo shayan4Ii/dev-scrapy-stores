@@ -66,7 +66,6 @@ class WalmartSpider(scrapy.Spider):
         for store_id in store_ids:
             store_url = f"https://www.walmart.com/store/{store_id}"
             yield scrapy.Request(url=store_url, headers=self.get_default_headers(), callback=self.parse_store)
-            break
 
     def parse_store(self, response: scrapy.http.Response) -> WalmartStoreItem:
         """Parse individual store page and extract store information."""
@@ -83,6 +82,7 @@ class WalmartSpider(scrapy.Spider):
         # Create and return WalmartStoreItem
         store_item = WalmartStoreItem(
             name=store_data['displayName'],
+            number=int(store_data['id']),
             address=self.format_address(store_data['address']),
             phone_number=store_data['phoneNumber'],
             hours=self.format_hours(store_data['operationalHours']),
@@ -109,7 +109,7 @@ class WalmartSpider(scrapy.Spider):
         """Format the store operational hours."""
         formatted_hours = {}
         for day_hours in operational_hours:
-            formatted_hours[day_hours['day']] = {
+            formatted_hours[day_hours['day'].lower()] = {
                 "open": self.convert_to_12h_format(day_hours['start']),
                 "close": self.convert_to_12h_format(day_hours['end'])
             }

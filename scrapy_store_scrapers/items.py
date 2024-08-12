@@ -12,6 +12,7 @@ class AlbertsonsStoreItem(Item):
 
 class SamsclubItem(Item):
     name: str = Field()
+    number: int = Field()
     address: str = Field()
     phone: str = Field()
     hours: Dict[str, Dict[str, str]] = Field()
@@ -20,6 +21,7 @@ class SamsclubItem(Item):
 
 class WalmartStoreItem(Item):
     name: str = Field()
+    number: int = Field()
     address: str = Field()
     phone_number: str = Field()
     hours: Dict[str, Dict[str, str]] = Field()
