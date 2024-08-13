@@ -1,22 +1,27 @@
-from datetime import datetime
 import json
+from datetime import datetime
+from typing import Generator, Dict, Any
+
 import scrapy
-from typing import Generator
+from scrapy.http import Response
+from scrapy.exceptions import DropItem
+from scrapy.loader import ItemLoader
+from itemloaders.processors import TakeFirst, MapCompose
 from scrapy_store_scrapers.items import MetrobytStoreItem
-
-STATE_LINKS_XPATH = "//a[@class='lm-homepage__state']/@href"
-STORE_LINKS_XPATH = "//a[@class='lm-state__store']/@href"
-
-SCRIPT_TEXT_XPATH = "//script[@type='application/ld+json']/text()"
 
 class MetrobytSpider(scrapy.Spider):
     name = "metrobyt"
     allowed_domains = ["www.metrobyt-mobile.com"]
     start_urls = ["https://www.metrobyt-mobile.com/stores/"]
 
-    def parse(self, response: scrapy.http.Response) -> Generator[scrapy.Request, None, None]:
+    # Constants
+    STATE_LINKS_XPATH = "//a[@class='lm-homepage__state']/@href"
+    STORE_LINKS_XPATH = "//a[@class='lm-state__store']/@href"
+    SCRIPT_TEXT_XPATH = "//script[@type='application/ld+json']/text()"
+
+    def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
         """Parse the main page and follow links to individual state pages."""
-        state_links = response.xpath(STATE_LINKS_XPATH).getall()
+        state_links = response.xpath(self.STATE_LINKS_XPATH).getall()
 
         if not state_links:
             self.logger.warning(f"No state links found on {response.url}")
@@ -24,62 +29,59 @@ class MetrobytSpider(scrapy.Spider):
         
         for link in state_links:
             yield response.follow(link, callback=self.parse_state)
-            break
 
-    def parse_state(self, response: scrapy.http.Response) -> Generator[scrapy.Request, None, None]:
+    def parse_state(self, response: Response) -> Generator[scrapy.Request, None, None]:
         """Parse the state page and follow links to individual store pages."""
-        store_links = response.xpath(STORE_LINKS_XPATH).getall()
+        store_links = response.xpath(self.STORE_LINKS_XPATH).getall()
 
         if not store_links:
             self.logger.warning(f"No store links found on {response.url}")
             return
 
-        for link in store_links[:20]:
+        for link in store_links:
             yield response.follow(link, callback=self.parse_store)
-            
-        
-    def parse_store(self, response: scrapy.http.Response) -> MetrobytStoreItem:
-        store_data = MetrobytStoreItem()
 
-        script_text = self.clean_text(response.xpath(SCRIPT_TEXT_XPATH).get())
+    def parse_store(self, response: Response) -> MetrobytStoreItem:
+        loader = ItemLoader(item=MetrobytStoreItem(), response=response)
+        loader.default_output_processor = TakeFirst()
+
+        script_text = self.clean_text(response.xpath(self.SCRIPT_TEXT_XPATH).get())
 
         if not script_text:
-            self.logger.error(f"No script text found on {response.url}")
-            return
+            raise DropItem(f"No script text found on {response.url}")
         
         store_raw_dict = json.loads(script_text)
-        store_data["address"] = store_raw_dict["address"]["streetAddress"].replace("\n", " ")
-        store_data["phone_number"] = store_raw_dict["telephone"]
+        
+        loader.add_value('address', store_raw_dict["address"]["streetAddress"], MapCompose(lambda x: x.replace("\n", " ")))
+        loader.add_value('phone_number', store_raw_dict["telephone"])
 
         geo_info = store_raw_dict["geo"]
-        store_data['location'] = {
-                'type': 'Point',
-                'coordinates': [geo_info['longitude'], geo_info['latitude']]
-            }
+        loader.add_value('location', {
+            'type': 'Point',
+            'coordinates': [geo_info['longitude'], geo_info['latitude']]
+        })
         
-        hours_info_list: list[str] = store_raw_dict["openingHoursSpecification"]
-        hours_dict = {}
+        hours_dict = self.parse_hours(store_raw_dict["openingHoursSpecification"])
+        loader.add_value('hours', hours_dict)
+
+        return loader.load_item()
+
+    @staticmethod
+    def parse_hours(hours_info_list: list[str]) -> Dict[str, Dict[str, str]]:
+        """Parse hours information into a structured dictionary."""
         day_abbr_dict = {
-            "Mo": "monday",
-            "Tu": "tuesday",
-            "We": "wednesday",
-            "Th": "thursday",
-            "Fr": "friday",
-            "Sa": "saturday",
-            "Su": "sunday"
+            "Mo": "monday", "Tu": "tuesday", "We": "wednesday",
+            "Th": "thursday", "Fr": "friday", "Sa": "saturday", "Su": "sunday"
         }
+        hours_dict = {}
 
         for hours_info in hours_info_list:
             day_abbr, hours_text = hours_info.split(" ", 1)
             day = day_abbr_dict.get(day_abbr)
-            hours_dict[day] = {
-                "open": self.convert_to_12_hour(hours_text.split("-")[0]),
-                "close": self.convert_to_12_hour(hours_text.split("-")[1])
-            }
-        
-        store_data["hours"] = hours_dict
+            open_time, close_time = map(MetrobytSpider.convert_to_12_hour, hours_text.split("-"))
+            hours_dict[day] = {"open": open_time, "close": close_time}
 
-        return store_data
+        return hours_dict
 
     @staticmethod
     def convert_to_12_hour(time_str: str) -> str:
@@ -87,11 +89,7 @@ class MetrobytSpider(scrapy.Spider):
         time_obj = datetime.strptime(time_str, '%H:%M')
         return time_obj.strftime('%I:%M %p').lower()
 
-
     @staticmethod
     def clean_text(text: str) -> str:
         """Clean and strip whitespace from text"""
         return text.strip() if text else ""
-
-        
-    
