@@ -40,3 +40,12 @@ class MetrobytStoreItem(Item):
     phone_number: str = Field()
     hours: Dict[str, Dict[str, str]] = Field()
     location: Dict[str, Union[str, List[float]]] = Field()
+
+class TraderjoesStoreItem(Item):
+    name: str = Field()
+    number: int = Field()
+    address: str = Field()
+    phone_number: str = Field()
+    hours: Dict[str, Dict[str, str]] = Field()
+    location: Dict[str, Union[str, List[float]]] = Field()
+    
