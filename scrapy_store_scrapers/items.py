@@ -34,3 +34,9 @@ class PizzahutStoreItem(Item):
     hours: Dict[str, Dict[str, str]] = Field()
     location: Dict[str, Union[str, List[float]]] = Field()
     services: List[str] = Field()
+
+class MetrobytStoreItem(Item):
+    address: str = Field()
+    phone_number: str = Field()
+    hours: Dict[str, Dict[str, str]] = Field()
+    location: Dict[str, Union[str, List[float]]] = Field()
