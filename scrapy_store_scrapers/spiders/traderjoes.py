@@ -21,6 +21,7 @@ class TraderjoesSpider(scrapy.Spider):
     STORE_LINKS_XPATH = '//a[@class="capital listitem"]/@href'
     JSON_SCRIPT_XPATH = "//script[@type='application/ld+json' and contains(text(),'GroceryStore')]/text()"
     NAME_XPATH = "//h1/text()"
+    COMING_SOON_TEXT_XPATH = '//p[@class="opening-comments"]/text()'
 
     def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
         """Recursively follow links on the main page until store pages are reached."""
@@ -53,11 +54,14 @@ class TraderjoesSpider(scrapy.Spider):
         except Exception as e:
             raise DropItem(f"Invalid JSON on {response.url}")
 
-        self.populate_item(loader, store_raw_dict)
+        self.populate_item(loader, store_raw_dict, response)
         return loader.load_item()
 
-    def populate_item(self, loader: ItemLoader, store_raw_dict: Dict[str, Any]) -> None:
+    def populate_item(self, loader: ItemLoader, store_raw_dict: Dict[str, Any], response: scrapy.http.Response) -> None:
         loader.add_xpath('name', self.NAME_XPATH, MapCompose(self.clean_store_name))
+        coming_soon_text = response.xpath(self.COMING_SOON_TEXT_XPATH).get()
+        loader.add_value('store_status', self.determine_store_status(coming_soon_text))
+        loader.add_xpath('store_status', self.COMING_SOON_TEXT_XPATH, MapCompose(self.determine_store_status))
         loader.add_value('number', int(store_raw_dict.get("@id", 0)))
 
         address_dict = store_raw_dict.get("address", {})
@@ -108,3 +112,7 @@ class TraderjoesSpider(scrapy.Spider):
     @staticmethod
     def clean_text(text: str) -> str:
         return text.strip() if text else ""
+    
+    @staticmethod
+    def determine_store_status(value):
+        return value.strip() if value and value.strip() else 'Active'

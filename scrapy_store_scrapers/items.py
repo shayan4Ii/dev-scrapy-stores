@@ -43,6 +43,7 @@ class MetrobytStoreItem(Item):
 
 class TraderjoesStoreItem(Item):
     name: str = Field()
+    store_status: str = Field()
     number: int = Field()
     address: str = Field()
     phone_number: str = Field()
