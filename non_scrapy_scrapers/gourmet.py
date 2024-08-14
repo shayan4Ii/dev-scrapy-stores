@@ -4,8 +4,8 @@ import logging
 from typing import Dict, List, Optional, Any
 from parsel import Selector
 
-class ShopRiteScraper:
-    BASE_URL = "https://www.shoprite.com/sm/pickup/rsid/3000/store/"
+class GourmentGarageScraper:
+    BASE_URL = "https://www.gourmetgarage.com/sm/planning/rsid/5000/store/"
 
     def __init__(self):
         self.url = self.BASE_URL
@@ -87,13 +87,13 @@ class ShopRiteScraper:
         self.logger.info(f"Scraped {len(stores)} stores")
         return stores
 
-    def save_to_file(self, stores: List[Dict[str, Any]], filename: str = 'data/shoprite_stores.json'):
+    def save_to_file(self, stores: List[Dict[str, Any]], filename: str = 'data/gourmetgarage_stores.json'):
         with open(filename, 'w') as f:
             json.dump(stores, f, indent=2)
         self.logger.info(f"Saved {len(stores)} stores to {filename}")
 
 def main():
-    scraper = ShopRiteScraper()
+    scraper = GourmentGarageScraper()
     stores = scraper.scrape_stores()
     
     # Print the scraped stores
