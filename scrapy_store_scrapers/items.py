@@ -59,6 +59,7 @@ class KFCStoreItem(Item):
     name: str = Field()
     address: str = Field()
     phone_number: str = Field()
+    services: List[str] = Field()
     hours: Dict[str, Dict[str, str]] = Field()
     location: Dict[str, Union[str, List[float]]] = Field()
     
