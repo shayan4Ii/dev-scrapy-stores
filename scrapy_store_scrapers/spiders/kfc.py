@@ -1,5 +1,7 @@
 import json
 from datetime import datetime
+from typing import Generator
+
 import scrapy
 from scrapy.http import Response
 from scrapy_store_scrapers.items import KFCStoreItem
@@ -26,7 +28,10 @@ class KfcSpider(scrapy.Spider):
     LATITUDE_XPATH = '//meta[@itemprop="latitude"]/@content'
     LONGITUDE_XPATH = '//meta[@itemprop="longitude"]/@content'
 
-    def parse(self, response: Response):
+    def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
+        """
+        Parse the main page and follow links to location pages or store pages.
+        """
         location_urls = response.xpath(self.LOCATION_URL_XPATH).getall()
         store_urls = response.xpath(self.STORE_URLS_XPATH).getall()
         if location_urls:
@@ -39,12 +44,17 @@ class KfcSpider(scrapy.Spider):
             yield self.parse_store(response)
 
     def parse_store(self, response: Response) -> KFCStoreItem:
+        """
+        Parse individual store page and extract store details.
+        """
         item = KFCStoreItem()
 
+        # Extract store name
         item['name'] = self.clean_text(response.xpath('normalize-space(//span[@id="location-name"])').get())
 
         address_elem = response.xpath(self.ADDRESS_ELEM_XPATH)
 
+        # Extract and combine address components
         street_address = self.clean_text(address_elem.xpath(self.STREET_ADDRESS_XPATH).get())
         street_address_2 = self.clean_text(address_elem.xpath(self.STREET_ADDRESS_2_XPATH).get())
         complete_street_address = self.clean_text(f"{street_address} {street_address_2}")
@@ -56,6 +66,7 @@ class KfcSpider(scrapy.Spider):
         item['address'] = f"{complete_street_address}, {city}, {region} {postal_code}"
         item['phone_number'] = response.xpath(self.PHONE_XPATH).get()
         
+        # Extract and validate location data
         try:
             latitude = float(response.xpath(self.LATITUDE_XPATH).get())
             longitude = float(response.xpath(self.LONGITUDE_XPATH).get())
@@ -68,6 +79,7 @@ class KfcSpider(scrapy.Spider):
             self.logger.warning(
                 f"Invalid location data for store: {item['address']}")
 
+        # Extract and parse hours data
         hours_json = response.xpath(self.HOURS_JSON_XPATH).get()
 
         if not hours_json:
@@ -104,10 +116,16 @@ class KfcSpider(scrapy.Spider):
     
     @staticmethod
     def convert_to_12_hour(time_str: str) -> str:
+        """
+        Convert 24-hour time string to 12-hour format.
+        """
         padded_time = time_str.zfill(4)
         time_obj = datetime.strptime(padded_time, '%H%M')
         return time_obj.strftime('%I:%M %p').lower()
 
     @staticmethod
     def clean_text(text: str) -> str:
+        """
+        Clean and strip whitespace from text.
+        """
         return text.strip() if text else ""
