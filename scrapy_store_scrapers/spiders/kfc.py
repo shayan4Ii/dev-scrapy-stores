@@ -1,9 +1,10 @@
+from datetime import datetime
 import scrapy
 from scrapy.http import Response
 from scrapy_store_scrapers.items import KFCStoreItem
 from scrapy.loader import ItemLoader
 from scrapy.http import Response
-from itemloaders.processors import TakeFirst, MapCompose
+from itemloaders.processors import TakeFirst, MapCompose, Identity
 
 class KfcSpider(scrapy.Spider):
     name = "kfc"
@@ -22,10 +23,10 @@ class KfcSpider(scrapy.Spider):
 
     PHONE_XPATH = '//div[@class="Core-body"]//div[@id="phone-main"]/text()'
     SERVICES = '//ul[@class="CoreServices"]/li/span/text()'
+    HOURS_JSON_XPATH = '//div[@id="hours-accordion-content"]/div/div/@data-days'
 
-    def parse(self, response: Response) :
+    def parse(self, response: Response):
         """
-        
         Parse the response and yield further requests or store data.
 
         This method handles three scenarios:
@@ -38,7 +39,6 @@ class KfcSpider(scrapy.Spider):
         
         Yields:
             Union[scrapy.Request, KFCStoreItem]: Either a new request or KFCStoreItem instance containing store data.
-
         """
 
         location_urls = response.xpath(self.LOCATION_URL_XPATH).getall()
@@ -87,11 +87,57 @@ class KfcSpider(scrapy.Spider):
 
         loader.add_value('address', full_address)
         loader.add_xpath('phone_number', self.PHONE_XPATH)
+        
+        hours_json = response.xpath(HOURS_JSON_XPATH).get()
 
-        loader.add_value('services', response.xpath(self.SERVICES).getall())
+        if not hours_json:
+            self.logger.warning(
+                f"No hours data found for store: {store_data['address']}")
+            store_data['hours'] = None
+        else:
+            try:
+                store_data['hours'] = {}
+                hours_data = json.loads(hours_json)
 
-        return loader.load_item()
+                for day_dict in hours_data:
+                    day = day_dict['day'].lower()
+
+                    if not day_dict['intervals']:
+                        self.logger.warning(
+                            f"No intervals found for {day} for store: {store_data['address']} with url: {response.url}")
+                        store_data['hours'][day] = None
+                        continue
+                    elif len(day_dict['intervals']) > 1:
+                        self.logger.error(
+                            f"Multiple intervals found for {day} for store: {store_data['address']} with url: {response.url}")
+
+                    open_time = day_dict['intervals'][0]['start']
+                    close_time = day_dict['intervals'][0]['end']
+                    store_data['hours'][day] = {
+                        "open": self.convert_to_12_hour(str(open_time)),
+                        "close": self.convert_to_12_hour(str(close_time))
+                    }
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to parse hours data: {e} for store: {store_data['address']} with url: {response.url}")
+                store_data['hours'] = None
+
+
+        item = loader.load_item()
+
+        services = response.xpath(self.SERVICES).getall()
+        item['services'] = services
+
+        return item
     
+    @staticmethod
+    def convert_to_12_hour(time_str: str) -> str:
+        """Convert 24-hour time string to 12-hour format."""
+        padded_time = time_str.zfill(4)
+        time_obj = datetime.strptime(padded_time, '%H%M')
+        return time_obj.strftime('%I:%M %p').lower()
+
+
     @staticmethod
     def clean_text(text: str) -> str:
         """
@@ -104,5 +150,3 @@ class KfcSpider(scrapy.Spider):
             str: The cleaned text.
         """
         return text.strip() if text else ""
-
-    
