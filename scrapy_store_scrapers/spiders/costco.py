@@ -11,7 +11,8 @@ class CostcoSpider(scrapy.Spider):
     custom_settings = {
         'ITEM_PIPELINES': {
             'scrapy_store_scrapers.pipelines.CostcoDuplicatesPipeline': 300,
-        }
+        },
+        'CONCURRENT_REQUESTS': 2,
     }
 
     API_FORMAT_URL = "https://www.costco.com/AjaxWarehouseBrowseLookupView?langId=-1&numOfWarehouses=50&hasGas=false&hasTires=false&hasFood=false&hasHearing=false&hasPharmacy=false&hasOptical=false&hasBusiness=false&hasPhotoCenter=&tiresCheckout=0&isTransferWarehouse=false&populateWarehouseDetails=true&warehousePickupCheckout=false&latitude={}&longitude={}&countryCode=US"
@@ -53,7 +54,7 @@ class CostcoSpider(scrapy.Spider):
         try:
             response_json = response.json()
         except json.JSONDecodeError:
-            self.logger.error("Invalid JSON response: %s", response.text)
+            self.logger.error("Invalid JSON response: %s (%s)", response.text, response.url)
             return
 
         for warehouse in response_json:
