@@ -27,3 +27,19 @@ class TacobellDuplicatesPipeline:
             self.seen_store_ids.add(store_id)
 
         return item
+
+class CostcoDuplicatesPipeline:
+
+    def __init__(self):
+        self.seen_store_ids = set()
+
+    def process_item(self, item, spider):
+        
+        store_id = item['stlocID']
+
+        if store_id in self.seen_store_ids:
+            raise DropItem(f"Duplicate store found: {item}")
+        else:
+            self.seen_store_ids.add(store_id)
+
+        return item
