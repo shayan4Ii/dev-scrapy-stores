@@ -59,7 +59,7 @@ class CostcoSpider(scrapy.Spider):
         for warehouse in response_json:
 
             if not isinstance(warehouse, dict):
-                self.logger.error("Invalid warehouse data: %s", warehouse)
+                self.logger.warning("Invalid warehouse data: %s", warehouse)
                 continue
 
             yield warehouse
