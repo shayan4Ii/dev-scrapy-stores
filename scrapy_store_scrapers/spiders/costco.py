@@ -30,7 +30,7 @@ class CostcoSpider(scrapy.Spider):
             return
         
         # Iterate through the locations and yield requests
-        for location in locations[:40]:
+        for location in locations:
             latitude = location['latitude']
             longitude = location['longitude']
 
