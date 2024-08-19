@@ -25,7 +25,7 @@ class MeijerScraper:
         """Set up error logging to write to a file."""
         logging.basicConfig(
             filename='meijer_scraper.log',
-            level=logging.ERROR,
+            level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
 
