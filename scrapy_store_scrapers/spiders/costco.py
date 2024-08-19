@@ -4,6 +4,9 @@ from typing import Generator
 import scrapy
 from scrapy.http import Response
 
+class InvalidJsonResponseException(Exception):
+    pass
+
 class CostcoSpider(scrapy.Spider):
     name = "costco"
     allowed_domains = ["www.costco.com"]
@@ -12,7 +15,11 @@ class CostcoSpider(scrapy.Spider):
         'ITEM_PIPELINES': {
             'scrapy_store_scrapers.pipelines.CostcoDuplicatesPipeline': 300,
         },
-        'CONCURRENT_REQUESTS': 2,
+        'CONCURRENT_REQUESTS': 1,
+        'RETRY_ENABLED': True,
+        'RETRY_TIMES': 3,  # Number of retries
+
+        'RETRY_EXCEPTIONS': ['scrapy.exceptions.DropItem', 'json.JSONDecodeError', 'InvalidJsonResponseException']
     }
 
     API_FORMAT_URL = "https://www.costco.com/AjaxWarehouseBrowseLookupView?langId=-1&numOfWarehouses=50&hasGas=false&hasTires=false&hasFood=false&hasHearing=false&hasPharmacy=false&hasOptical=false&hasBusiness=false&hasPhotoCenter=&tiresCheckout=0&isTransferWarehouse=false&populateWarehouseDetails=true&warehousePickupCheckout=false&latitude={}&longitude={}&countryCode=US"
@@ -55,7 +62,8 @@ class CostcoSpider(scrapy.Spider):
             response_json = response.json()
         except json.JSONDecodeError:
             self.logger.error("Invalid JSON response: %s (%s)", response.text, response.url)
-            return
+            
+            raise InvalidJsonResponseException(f"Invalid JSON response from {response.url}")
 
         for warehouse in response_json:
 
