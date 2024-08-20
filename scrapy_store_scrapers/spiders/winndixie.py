@@ -11,6 +11,12 @@ class WinnDixieSpider(scrapy.Spider):
     name = "winndixie"
     allowed_domains = ["www.winndixie.com"]
 
+    custom_settings = {
+        'ITEM_PIPELINES': {
+            'scrapy_store_scrapers.pipelines.WinnDixieDuplicatesPipeline': 300,
+        },
+    }
+
     def start_requests(self) -> Generator[Request, None, None]:
         """Generate initial requests for the spider."""
         url = "https://www.winndixie.com/V2/storelocator/getStores"
