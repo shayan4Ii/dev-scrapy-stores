@@ -113,5 +113,5 @@ duplicate_detect.py
 remove_duplicate.py
 alert.mp3
 scrape_progress.db
-scraped_data.jsonl
-meijer_progress.db
+*.jsonl
+*.db
