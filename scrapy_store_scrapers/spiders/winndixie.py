@@ -1,16 +1,26 @@
 import json
+from typing import Any, Generator
+
 import scrapy
+from scrapy.http import Request, Response
 
 
-class WinndixieSpider(scrapy.Spider):
+class WinnDixieSpider(scrapy.Spider):
+    """Spider for scraping WinnDixie store locations."""
+
     name = "winndixie"
     allowed_domains = ["www.winndixie.com"]
 
-    def start_requests(self):
+    def start_requests(self) -> Generator[Request, None, None]:
+        """Generate initial requests for the spider."""
         url = "https://www.winndixie.com/V2/storelocator/getStores"
 
-        zipcodes = self.load_zipcodes("zipcodes.json")
-
+        try:
+            zipcodes = self.load_zipcodes("zipcodes.json")
+        except (FileNotFoundError, ValueError) as e:
+            self.logger.error(f"Error loading zipcodes: {str(e)}")
+            return
+        
         for zipcode in zipcodes:
             data = {
                 "search": zipcode,
@@ -18,36 +28,38 @@ class WinndixieSpider(scrapy.Spider):
                 "filter": ""
             }
 
-            yield scrapy.Request(
+            yield Request(
                 method='POST',
                 headers=self.get_headers(),
                 url=url,
-                body=json.dumps(data)
+                body=json.dumps(data),
+                callback=self.parse
             )
 
-
-    def parse(self, response):
-        yield from response.json()
-
-    def load_zipcodes(self, zipcode_file) -> list[str]:
-        """Load zipcodes from the JSON file."""
+    def parse(self, response: Response) -> Generator[dict[str, Any], None, None]:
+        """Parse the response and yield filtered store data."""
         try:
-            with open(zipcode_file, 'r') as f:
-                locations = json.load(f)
-        except FileNotFoundError:
-            self.logger.error(f"File not found: {self.zipcode_file}")
-            raise FileNotFoundError(f"File not found: {self.zipcode_file}")
+            stores = response.json()
+            # filtered_stores = self.filter_stores(stores)
+            for store in stores:
+                yield store
         except json.JSONDecodeError:
-            self.logger.error(f"Invalid JSON file: {self.zipcode_file}")
-            raise ValueError(f"Invalid JSON file: {self.zipcode_file}")
-        
-        zipcodes = []
-        for location in locations:
-            zipcodes.extend(location.get('zip_codes', []))
-        return zipcodes
+            self.logger.error(f"Failed to parse JSON from response: {response.url}")
 
     @staticmethod
-    def filter_stores(stores):
+    def load_zipcodes(zipcode_file: str) -> list[str]:
+        """Load zipcodes from the JSON file."""
+        with open(zipcode_file, 'r') as f:
+            locations = json.load(f)
+        
+        zipcodes = set()
+        for location in locations:
+            zipcodes.update(location.get('zip_codes', []))
+        return list(zipcodes)
+
+    @staticmethod
+    def filter_stores(stores: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Filter stores based on criteria of website to show on frontend."""
         return [
             store for store in stores
             if (
@@ -57,7 +69,8 @@ class WinndixieSpider(scrapy.Spider):
         ]
 
     @staticmethod
-    def get_headers():
+    def get_headers() -> dict[str, str]:
+        """Return headers for the HTTP request."""
         return {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en-US,en;q=0.9",
@@ -66,4 +79,3 @@ class WinndixieSpider(scrapy.Spider):
             "referer": "https://www.winndixie.com/locator",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
         }
-    
