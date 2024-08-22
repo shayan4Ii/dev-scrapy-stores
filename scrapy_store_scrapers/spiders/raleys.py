@@ -9,10 +9,6 @@ class RaleysSpider(scrapy.Spider):
     name = "raleys"
     allowed_domains = ["www.raleys.com"]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.logger = logging.getLogger(self.name)
-
     def start_requests(self) -> Generator[scrapy.Request, None, None]:
         """
         Initiates the crawling process by sending the first request.
