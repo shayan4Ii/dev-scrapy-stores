@@ -115,3 +115,4 @@ alert.mp3
 scrape_progress.db
 *.jsonl
 *.db
+scrapy_command
