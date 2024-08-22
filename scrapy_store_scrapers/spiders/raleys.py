@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Generator
+from typing import Any, Union, Generator
 
 import scrapy
 from scrapy.http import Response
@@ -29,7 +29,7 @@ class RaleysSpider(scrapy.Spider):
         except Exception as e:
             self.logger.error(f"Error in start_requests: {str(e)}")
 
-    def parse(self, response: Response) -> Generator[dict[str, Any], None, None]:
+    def parse(self, response: Response) -> Generator[Union[dict, scrapy.Request], None, None]:
         """
         Parses the response and yields store data. If there are more pages,
         it sends a new request for the next page.
