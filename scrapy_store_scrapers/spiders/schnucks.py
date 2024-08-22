@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Iterator, Dict, Any
+from typing import Generator
 
 import scrapy
 from scrapy.http import Response
@@ -16,7 +16,7 @@ class SchnucksSpider(scrapy.Spider):
 
     SCRIPT_TEXT_XPATH = '//script[@id="__NEXT_DATA__"]/text()'
 
-    def parse(self, response: Response) -> Iterator[Dict[str, Any]]:
+    def parse(self, response: Response) -> Generator[dict, None, None]:
         """
         Parse the response and extract location data.
 
@@ -24,7 +24,7 @@ class SchnucksSpider(scrapy.Spider):
             response (Response): The response object from the request.
 
         Yields:
-            Iterator[Dict[str, Any]]: An iterator of dictionaries containing location data.
+            Generator[dict, None, None]: An Generator of dictionaries containing location data.
         """
         self.logger.info(f"Parsing response from {response.url}")
 
