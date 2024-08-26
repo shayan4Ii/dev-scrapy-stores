@@ -148,14 +148,28 @@ class WegmansSpider(scrapy.Spider):
 
             if not script_text:
                 self.logger.warning("No script text found for store hours")
-                return None
+                return self.extract_hours_from_html(response)
 
             # Extract the JSON data from the script tag
             json_data = json.loads(script_text)
 
             hours = {}
 
-            hour_info = json_data["openingHoursSpecification"][0]
+            opening_hours_spec = json_data.get("openingHoursSpecification")
+
+            if not opening_hours_spec:
+                self.logger.warning("No openingHoursSpecification found in JSON data")
+                return self.extract_hours_from_html(response)
+
+            if isinstance(opening_hours_spec, list):
+                if len(opening_hours_spec) > 1:
+                    self.logger.warning("Multiple openingHoursSpecification found")
+                hour_info = opening_hours_spec[0]
+            elif isinstance(opening_hours_spec, dict):
+                hour_info = opening_hours_spec
+            else:
+                self.logger.error("Unexpected type for openingHoursSpecification")
+                return self.extract_hours_from_html(response)
 
             for day in hour_info["dayOfWeek"]:
                 hours[day.lower()] = {
@@ -166,12 +180,42 @@ class WegmansSpider(scrapy.Spider):
             return hours
         except json.JSONDecodeError:
             self.logger.error("Failed to decode JSON data for store hours")
-            return None
+            return self.extract_hours_from_html(response)
         except KeyError as e:
             self.logger.error(f"Missing key in JSON data for store hours: {str(e)}")
-            return None
+            return self.extract_hours_from_html(response)
         except Exception as e:
             self.logger.error(f"Error extracting store hours: {str(e)}")
+            return self.extract_hours_from_html(response)
+
+    def extract_hours_from_html(self, response: Response) -> Optional[dict]:
+        """Extract store hours from HTML when JSON data is not available."""
+        try:
+            hours_text = response.xpath("//div[@id='storeHoursID']/text()").get()
+            if not hours_text:
+                self.logger.warning("No store hours found in HTML")
+                return None
+
+            hours_text = hours_text.strip()
+            self.logger.info(f"Extracting hours from HTML: {hours_text}")
+
+            # Parse the hours text
+            if "Open" in hours_text and "to" in hours_text:
+                parts = hours_text.split("Open")[1].split("to")
+                open_time = parts[0].strip()
+                close_time = parts[1].split(",")[0].strip()
+
+                # Create a dictionary for all days of the week
+                days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                hours = {day: {"open": open_time, "close": close_time} for day in days}
+
+                return hours
+            else:
+                self.logger.warning(f"Unexpected format for store hours: {hours_text}")
+                return None
+
+        except Exception as e:
+            self.logger.error(f"Error extracting hours from HTML: {str(e)}")
             return None
 
     @staticmethod
