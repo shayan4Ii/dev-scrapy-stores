@@ -205,6 +205,10 @@ class WegmansSpider(scrapy.Spider):
                 open_time = parts[0].strip()
                 close_time = parts[1].split(",")[0].strip()
 
+                # Standardize the times
+                open_time = self.standardize_time(open_time)
+                close_time = self.standardize_time(close_time)
+
                 # Create a dictionary for all days of the week
                 days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
                 hours = {day: {"open": open_time, "close": close_time} for day in days}
@@ -218,6 +222,42 @@ class WegmansSpider(scrapy.Spider):
             self.logger.error(f"Error extracting hours from HTML: {str(e)}")
             return None
 
+    @staticmethod
+    def standardize_time(time_str: str) -> str:
+        """Standardize time format to HH:MM AM/PM."""
+        time_str = time_str.strip().upper()
+        
+        # Handle special case for Midnight
+        if time_str == "MIDNIGHT":
+            return "12:00 AM"
+        
+        # Handle special case for Noon
+        if time_str == "NOON":
+            return "12:00 PM"
+        
+        # Remove any periods from AM/PM
+        time_str = time_str.replace(".", "")
+        
+        # Add space before AM/PM if missing
+        if time_str.endswith("AM") or time_str.endswith("PM"):
+            if not time_str[-3].isspace():
+                time_str = time_str[:-2] + " " + time_str[-2:]
+        
+        # Try parsing the time
+        try:
+            # Try parsing with minutes
+            parsed_time = datetime.strptime(time_str, "%I:%M %p")
+        except ValueError:
+            try:
+                # Try parsing without minutes
+                parsed_time = datetime.strptime(time_str, "%I %p")
+            except ValueError:
+                logging.error(f"Unable to parse time: {time_str}")
+                return time_str  # Return original string if parsing fails
+        
+        # Format the time consistently
+        return parsed_time.strftime("%I:%M %p").lstrip("0")
+    
     @staticmethod
     def convert_to_12h_format(time_str):
         try:
