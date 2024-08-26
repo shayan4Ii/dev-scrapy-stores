@@ -10,10 +10,7 @@ class WegmansSpider(scrapy.Spider):
     name = "wegmans"
     allowed_domains = ["www.wegmans.com"]
     start_urls = ["https://shop.wegmans.com/api/v2/stores"]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.logger = logging.getLogger(self.name)
+    store_items = {}
 
     def parse(self, response: Response) -> Generator[Request, None, None]:
         """Parse the response and yield new requests for store pages."""
@@ -28,23 +25,39 @@ class WegmansSpider(scrapy.Spider):
 
         for raw_store_info in stores:
             try:
-                url = raw_store_info["external_url"]
-                yield Request(url, callback=self.parse_store, cb_kwargs={"raw_store_info": raw_store_info})
+                retailer_store_id = raw_store_info["retailer_store_id"]
+                self.store_items[retailer_store_id] = raw_store_info
             except KeyError:
-                self.logger.warning(f"Missing 'external_url' for store: {raw_store_info}")
+                self.logger.warning(f"Missing 'retailer_store_id' for store: {raw_store_info}")
+        
+        yield Request('https://www.wegmans.com/stores/', callback=self.parse_stores)
 
-    def parse_store(self, response: Response, raw_store_info: dict) -> Optional[dict]:
+    def parse_stores(self, response: Response) -> Generator[dict, None, None]:
+        """Parse the stores page and yield store information."""
+        try:
+            store_links = response.xpath("//div[@class='wpb_wrapper']//a[contains(@href,'/stores/')]/@href")
+            for store_url in store_links:
+                yield response.follow(store_url, callback=self.parse_store)
+        except Exception as e:
+            self.logger.error(f"Error parsing stores page: {str(e)}")
+
+    def parse_store(self, response: Response) -> Optional[dict]:
         """Parse the store page and yield store information."""
         try:
             store_data = {}
 
             store_data["name"] = response.xpath("//div[@id='storeTitle']/h1/text()").get()
             store_data["number"] = response.xpath("//span[@id='store-number']/text()").get()
+
+            # Get the raw store information from the store_items dictionary
+            raw_store_info = self.store_items.get(store_data["number"])
+
             store_data["address"] = self.get_address(raw_store_info)
             store_data["phone"] = self.get_phone_number(raw_store_info)
             store_data["hours"] = self.get_hours(response)
             store_data["services"] = self.get_services(response)
             store_data["location"] = self.get_location(raw_store_info)
+            store_data["raw_dict"] = raw_store_info
 
             return store_data
         except Exception as e:
