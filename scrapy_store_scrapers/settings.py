@@ -73,6 +73,22 @@ USER_AGENTS = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
 ]
 
+CURRENT_DATE = datetime.now().strftime("%Y%m%d")
+FEEDS = {
+    f'data/%(name)s-{CURRENT_DATE}.json': {
+        'format': 'json',
+        'encoding': 'utf8',
+        'store_empty': False,
+        'overwrite': True,
+    },
+}
+
+LOG_ENABLED = True
+LOG_FILE_APPEND = False
+LOG_LEVEL = 'INFO'  # You can change this to 'INFO', 'WARNING', 'ERROR' as needed
+LOG_FORMAT = '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
+LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
+LOG_FILE = 'logs/logs.log'
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
 # EXTENSIONS = {
