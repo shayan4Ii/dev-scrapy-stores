@@ -4,6 +4,7 @@ import logging
 from scrapy import Spider
 from scrapy.http import Response, Request
 
+
 class ShopmarketbasketSpider(Spider):
     """Spider for scraping ShopMarketBasket store information."""
 
@@ -29,7 +30,7 @@ class ShopmarketbasketSpider(Spider):
         """Parse the initial response and yield requests for individual store pages."""
         try:
             stores = response.json()
-            for store in stores[:20]:
+            for store in stores:
                 yield response.follow(
                     store["path"],
                     callback=self.parse_store,
@@ -70,9 +71,10 @@ class ShopmarketbasketSpider(Spider):
         """Extract store hours."""
         hours_info = {}
 
-        mon_sat_hours_range_text = response.xpath(self.MON_SAT_HOURS_XPATH).re_first(self.MON_SAT_HOURS_RANGE_REGEX,"").strip()
-        sun_hours = response.xpath(self.SUN_HOURS_XPATH).re_first(self.SUN_HOURS_REGEX,"").strip()
-
+        mon_sat_hours_range_text = response.xpath(self.MON_SAT_HOURS_XPATH).re_first(
+            self.MON_SAT_HOURS_RANGE_REGEX, "").strip()
+        sun_hours = response.xpath(self.SUN_HOURS_XPATH).re_first(
+            self.SUN_HOURS_REGEX, "").strip()
 
         if mon_sat_hours_range_text and sun_hours:
             mon_sat_open, mon_sat_close = mon_sat_hours_range_text.split("-")
@@ -93,12 +95,13 @@ class ShopmarketbasketSpider(Spider):
             self.logger.error("Error extracting hours")
 
         return hours_info
-    
+
     def get_address(self, response: Response) -> str:
         """Extract store address."""
         try:
             address_container = response.xpath(self.ADDRESS_CONTAINER_XPATH)
-            street = self.safe_extract(address_container, self.STREET_ADDRESS_XPATH)
+            street = self.safe_extract(
+                address_container, self.STREET_ADDRESS_XPATH)
             city = self.safe_extract(address_container, self.CITY_XPATH)
             state = self.safe_extract(address_container, self.STATE_XPATH)
             postal_code = self.safe_extract(address_container, self.ZIP_XPATH)
@@ -123,7 +126,7 @@ class ShopmarketbasketSpider(Spider):
     def safe_extract(self, selector, xpath: str) -> str:
         """Safely extract text from an XPath selector."""
         return selector.xpath(xpath).get('').strip()
-        
+
     def handle_error(self, failure):
         """Handle request failures."""
         self.logger.error(f"Request failed: {failure.value}")
