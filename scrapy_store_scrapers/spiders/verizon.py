@@ -19,7 +19,7 @@ class VerizonSpider(scrapy.Spider):
     def start_requests(self) -> Generator[scrapy.Request, None, None]:
         """Generate initial requests based on zipcode data."""
         zipcodes = self._load_zipcode_data()
-        for zipcode in zipcodes[:20]:
+        for zipcode in zipcodes:
             payload = self._get_payload(zipcode["latitude"], zipcode["longitude"])
             yield scrapy.Request(
                 url="https://www.verizon.com/digital/nsa/nos/gw/retail/searchresultsdata",
