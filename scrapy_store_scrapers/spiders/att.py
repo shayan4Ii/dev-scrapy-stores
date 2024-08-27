@@ -49,7 +49,8 @@ class AttSpider(scrapy.Spider):
                 "phone": self._get_phone(store),
                 "address": self._get_address(store),
                 "location": self._get_location(store),
-                "hours": self._get_hours(store)
+                "hours": self._get_hours(store),
+                "raw_dict": store
             }
 
     def _extract_app_key(self, text: str) -> Optional[str]:
