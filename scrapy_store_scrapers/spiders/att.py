@@ -24,7 +24,7 @@ class AttSpider(scrapy.Spider):
             return
 
         zipcodes = self._load_zipcode_data()
-        for zipcode in zipcodes[:5]:
+        for zipcode in zipcodes:
             headers = self._get_headers()
             payload = self._get_payload(zipcode["zipcode"], zipcode["latitude"], zipcode["longitude"], app_key)
             yield scrapy.Request(
