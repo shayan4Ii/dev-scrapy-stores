@@ -1,22 +1,22 @@
-from typing import Generator
-
-import scrapy
+from typing import Generator, Optional
+import re
+import logging
+from scrapy import Spider
 from scrapy.http import Response, Request
 
-class ShopmarketbasketSpider(scrapy.Spider):
+class ShopmarketbasketSpider(Spider):
+    """Spider for scraping ShopMarketBasket store information."""
+
     name = "shopmarketbasket"
     allowed_domains = ["www.shopmarketbasket.com"]
     start_urls = ["https://www.shopmarketbasket.com/store-locations-rest"]
 
     NAME_XPATH = "//section[@class='flyer-header']/h2/span/text()"
-
     PHONE_XPATH = "//div[contains(@class, 'field--name-field-phone-number')]/div/a/text()"
-    SERVICES = "//div[@class='departments']/ul/li/text()"
-
+    SERVICES_XPATH = "//div[@class='departments']/ul/li/text()"
     MON_SAT_HOURS_XPATH = "normalize-space(//div[contains(@class,'field--name-field-hours')]/div/p[contains(., 'Monday - Saturday')])"
     SUN_HOURS_XPATH = "normalize-space(//div[contains(@class,'field--name-field-hours')]/div/p[contains(., 'Sunday')])"
-
-    ADDRESS_CONTAINER = "//p[@class='address']"
+    ADDRESS_CONTAINER_XPATH = "//p[@class='address']"
     STREET_ADDRESS_XPATH = ".//span[@class='address-line1']/text()"
     CITY_XPATH = ".//span[@class='locality']/text()"
     STATE_XPATH = ".//span[@class='administrative-area']/text()"
@@ -26,88 +26,104 @@ class ShopmarketbasketSpider(scrapy.Spider):
     SUN_HOURS_REGEX = r"Sunday(.*)"
 
     def parse(self, response: Response) -> Generator[Request, None, None]:
-        stores = response.json()
-        for store in stores:
-            yield response.follow(store["path"], callback=self.parse_store, cb_kwargs={"geo_loc_str": store["field_geolocation"]})
+        """Parse the initial response and yield requests for individual store pages."""
+        try:
+            stores = response.json()
+            for store in stores[:20]:
+                yield response.follow(
+                    store["path"],
+                    callback=self.parse_store,
+                    cb_kwargs={"geo_loc_str": store["field_geolocation"]},
+                    errback=self.handle_error
+                )
+        except Exception as e:
+            self.logger.error(f"Error parsing store list: {str(e)}")
 
     def parse_store(self, response: Response, geo_loc_str: str) -> dict:
-        
-        store_info = {}
-        store_info["name"] = self.get_name(response)
-        store_info["address"] = self.get_address(response)
-        store_info["phone"] = self.get_phone(response)
-        store_info["location"] = self.get_location(geo_loc_str)
-        store_info["hours"] = self.get_hours(response)
-        store_info["services"] = self.get_services(response)
+        """Parse individual store page and extract store information."""
+        try:
+            return {
+                "name": self.get_name(response),
+                "address": self.get_address(response),
+                "phone": self.get_phone(response),
+                "location": self.get_location(geo_loc_str),
+                "hours": self.get_hours(response),
+                "services": self.get_services(response)
+            }
+        except Exception as e:
+            self.logger.error(f"Error parsing store page: {str(e)}")
+            return {}
 
-        return store_info
+    def get_name(self, response: Response) -> Optional[str]:
+        """Extract store name."""
+        return self.safe_extract(response, self.NAME_XPATH)
 
+    def get_phone(self, response: Response) -> Optional[str]:
+        """Extract store phone number."""
+        return self.safe_extract(response, self.PHONE_XPATH)
 
-    def get_name(self, response: Response) -> str: 
-        return response.xpath(self.NAME_XPATH).get()
-    
-    def get_phone(self, response: Response) -> str:
-        return response.xpath(self.PHONE_XPATH).get()
-    
     def get_services(self, response: Response) -> list:
-        return response.xpath(self.SERVICES).getall()
+        """Extract store services."""
+        return response.xpath(self.SERVICES_XPATH).getall()
 
     def get_hours(self, response: Response) -> dict[str, dict[str, str]]:
+        """Extract store hours."""
         hours_info = {}
 
         mon_sat_hours_range_text = response.xpath(self.MON_SAT_HOURS_XPATH).re_first(self.MON_SAT_HOURS_RANGE_REGEX,"").strip()
         sun_hours = response.xpath(self.SUN_HOURS_XPATH).re_first(self.SUN_HOURS_REGEX,"").strip()
 
-        mon_sat_open, mon_sat_close = mon_sat_hours_range_text.split("-")
-        sun_open, sun_close = sun_hours.split("-")
 
-        for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]:
-            if day == "sunday":
-                hours_info[day] = {
-                    "open": sun_open.strip(),
-                    "close": sun_close.strip()
-                }
-            else:
-                hours_info[day] = {
-                    "open": mon_sat_open.strip(),
-                    "close": mon_sat_close.strip()
-                }
+        if mon_sat_hours_range_text and sun_hours:
+            mon_sat_open, mon_sat_close = mon_sat_hours_range_text.split("-")
+            sun_open, sun_close = sun_hours.split("-")
+
+            for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]:
+                if day == "sunday":
+                    hours_info[day] = {
+                        "open": sun_open.strip(),
+                        "close": sun_close.strip()
+                    }
+                else:
+                    hours_info[day] = {
+                        "open": mon_sat_open.strip(),
+                        "close": mon_sat_close.strip()
+                    }
+        else:
+            self.logger.error("Error extracting hours")
+
         return hours_info
     
     def get_address(self, response: Response) -> str:
+        """Extract store address."""
         try:
-            address_container = response.xpath(self.ADDRESS_CONTAINER)
-            street = address_container.xpath(self.STREET_ADDRESS_XPATH).get()
-            city = address_container.xpath(self.CITY_XPATH).get()
-            state = address_container.xpath(self.STATE_XPATH).get()
-            postal_code = address_container.xpath(self.ZIP_XPATH).get()
+            address_container = response.xpath(self.ADDRESS_CONTAINER_XPATH)
+            street = self.safe_extract(address_container, self.STREET_ADDRESS_XPATH)
+            city = self.safe_extract(address_container, self.CITY_XPATH)
+            state = self.safe_extract(address_container, self.STATE_XPATH)
+            postal_code = self.safe_extract(address_container, self.ZIP_XPATH)
 
-            formatted_address = f"{street}, {city}, {state} {postal_code}"
-            return formatted_address
+            return f"{street}, {city}, {state} {postal_code}"
         except Exception as e:
             self.logger.error(f"Error extracting address: {str(e)}")
             return ""
-        
 
-    def get_location(self, geo_loc_str: str) -> dict:
+    def get_location(self, geo_loc_str: str) -> Optional[dict]:
+        """Extract and format store location."""
         try:
-            latitude, longitude = geo_loc_str.split(",")
-            
-            # Convert latitude and longitude to float if they exist
-            if latitude is not None and longitude is not None:
-                try:
-                    longitude = float(longitude)
-                    latitude = float(latitude)
-                    return {
-                        "type": "Point",
-                        "coordinates": [longitude, latitude]  # GeoJSON uses [longitude, latitude] order
-                    }
-                except ValueError:
-                    self.logger.warning(f"Invalid latitude or longitude values: {latitude}, {longitude}")
-                    return None
-            else:
-                self.logger.warning("Missing latitude or longitude")
-                return None
+            latitude, longitude = map(float, geo_loc_str.split(","))
+            return {
+                "type": "Point",
+                "coordinates": [longitude, latitude]
+            }
         except Exception as e:
             self.logger.error(f"Error extracting location: {str(e)}")
             return None
+
+    def safe_extract(self, selector, xpath: str) -> str:
+        """Safely extract text from an XPath selector."""
+        return selector.xpath(xpath).get('').strip()
+        
+    def handle_error(self, failure):
+        """Handle request failures."""
+        self.logger.error(f"Request failed: {failure.value}")
