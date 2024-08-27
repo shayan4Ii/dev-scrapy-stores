@@ -46,7 +46,7 @@ class AttSpider(scrapy.Spider):
 
             yield {
                 "name": self._get_name(store),
-                "phone": self._get_phone(store),
+                "phone_number": self._get_phone(store),
                 "address": self._get_address(store),
                 "location": self._get_location(store),
                 "hours": self._get_hours(store),

@@ -53,7 +53,7 @@ class WegmansSpider(scrapy.Spider):
             raw_store_info = self.store_items.get(store_data["number"])
 
             store_data["address"] = self.get_address(raw_store_info)
-            store_data["phone"] = self.get_phone_number(raw_store_info)
+            store_data["phone_number"] = self.get_phone_number(raw_store_info)
             store_data["hours"] = self.get_hours(response)
             store_data["services"] = self.get_services(response)
             store_data["location"] = self.get_location(raw_store_info)

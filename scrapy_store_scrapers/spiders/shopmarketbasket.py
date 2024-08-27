@@ -46,7 +46,7 @@ class ShopmarketbasketSpider(Spider):
             return {
                 "name": self.get_name(response),
                 "address": self.get_address(response),
-                "phone": self.get_phone(response),
+                "phone_number": self.get_phone(response),
                 "location": self.get_location(geo_loc_str),
                 "hours": self.get_hours(response),
                 "services": self.get_services(response)
