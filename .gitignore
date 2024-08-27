@@ -116,3 +116,4 @@ scrape_progress.db
 *.jsonl
 *.db
 scrapy_command
+ai_improve_command.txt
