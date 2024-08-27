@@ -1,64 +1,86 @@
 import json
-from typing import Generator, Union, Optional
 import re
+from typing import Generator, Optional, Union
 
 import scrapy
+from scrapy.http import Response
 
 
 class VerizonSpider(scrapy.Spider):
+    """Scrapy spider for scraping Verizon store information."""
+
     name = "verizon"
     allowed_domains = ["www.verizon.com"]
 
-    store_numbers = []
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.store_numbers = set()
 
     def start_requests(self) -> Generator[scrapy.Request, None, None]:
+        """Generate initial requests based on zipcode data."""
         zipcodes = self._load_zipcode_data()
         for zipcode in zipcodes[:20]:
             payload = self._get_payload(zipcode["latitude"], zipcode["longitude"])
             yield scrapy.Request(
-                url=f"https://www.verizon.com/digital/nsa/nos/gw/retail/searchresultsdata",
+                url="https://www.verizon.com/digital/nsa/nos/gw/retail/searchresultsdata",
                 method="POST",
                 body=json.dumps(payload),
                 headers=self._get_headers(),
-                callback=self.parse_stores
+                callback=self.parse_stores,
+                errback=self.errback_httpbin,
             )
 
-    def parse_stores(self, response: scrapy.http.Response) -> Generator[dict[str, Union[str, dict]], None, None]:
-        stores = response.json()["body"]["data"]["stores"]
-        for store in stores:
-            store_info = {}
+    def parse_stores(self, response: Response) -> Generator[dict[str, Union[str, dict]], None, None]:
+        """Parse store information from the response."""
+        try:
+            stores = response.json()["body"]["data"]["stores"]
+            for store in stores:
+                store_info = self._extract_store_info(store)
+                if store_info:
+                    yield store_info
+        except Exception as e:
+            self.logger.error(f"Error parsing stores: {e}")
 
+    def _extract_store_info(self, store: dict) -> Optional[dict]:
+        """Extract relevant information from a store."""
+        try:
             store_no = self._get_number(store)
-
             if store_no in self.store_numbers:
-                continue
+                return None
 
-            self.store_numbers.append(store_no)
+            self.store_numbers.add(store_no)
 
-            store_info["name"] = self._get_name(store)
-            store_info["number"] = store_no
-            store_info["phone_number"] = self._phone_number(store)
-            store_info["location"] = self._get_location(store)
-            store_info["hours"] = self._get_hours(store)
-
-            yield store_info
+            return {
+                "name": self._get_name(store),
+                "number": store_no,
+                "phone_number": self._get_phone_number(store),
+                "location": self._get_location(store),
+                "hours": self._get_hours(store),
+                "raw_dict": store
+            }
+        except Exception as e:
+            self.logger.error(f"Error extracting store info: {e}")
+            return None
 
     @staticmethod
     def _get_number(store: dict) -> str:
+        """Get the store number."""
         return store["storeNumber"]
-    
+
     @staticmethod
     def _get_name(store: dict) -> str:
+        """Get the store name."""
         return store["storeName"]
 
     @staticmethod
-    def _phone_number(store: dict) -> str:
+    def _get_phone_number(store: dict) -> str:
+        """Get the store phone number."""
         return store["phoneNumber"]
 
     def _get_location(self, store: dict) -> Optional[dict[str, Union[str, list[float]]]]:
         """Get the store location in GeoJSON Point format."""
         try:
-            location = store.get('location')
+            location = store.get('location', {})
             latitude = location.get('latitude')
             longitude = location.get('longitude')
             
@@ -73,14 +95,12 @@ class VerizonSpider(scrapy.Spider):
             self.logger.warning(f"Invalid latitude or longitude values: {latitude}, {longitude}")
             return None
         except Exception as e:
-            self.logger.error(f"Error extracting location: {str(e)}")
+            self.logger.error(f"Error extracting location: {e}")
             return None
         
-    def _get_hours(self, store: dict) -> Optional[dict[str, str]]:
+    def _get_hours(self, store: dict) -> Optional[dict[str, dict[str, Optional[str]]]]:
         """Get the store hours."""
-
         hours_info = {}
-
         day_key_map = {
             "monday": "hoursMon",
             "tuesday": "hoursTue",
@@ -93,23 +113,17 @@ class VerizonSpider(scrapy.Spider):
         
         for day, day_key in day_key_map.items():
             hours = store.get(day_key)
-
             if not hours:
                 self.logger.warning(f"Missing hours for {day}")
+                hours_info[day] = {"open": None, "close": None}
                 continue
 
             open_close = self._get_open_close(hours)
             if open_close:
                 open_time, close_time = open_close
-                hours_info[day] = {
-                    "open": open_time,
-                    "close": close_time
-                }
+                hours_info[day] = {"open": open_time, "close": close_time}
             else:
-                hours_info[day] = {
-                    "open": None,
-                    "close": None
-                }
+                hours_info[day] = {"open": None, "close": None}
             
         return hours_info
 
@@ -117,7 +131,6 @@ class VerizonSpider(scrapy.Spider):
         """Get the open and close times from a string."""
         try:
             hours = hours.strip().lower()
-
             if hours == "closed closed":
                 return None, None
 
@@ -130,15 +143,13 @@ class VerizonSpider(scrapy.Spider):
             self.logger.warning(f"Invalid hours format: {hours}")
             return None
         except Exception as e:
-            if self.logger:
-                self.logger.error(f"Error extracting open and close times: {str(e)}")
+            self.logger.error(f"Error extracting open and close times: {e}")
             return None
-
 
     def _load_zipcode_data(self) -> list[dict[str, Union[str, float]]]:
         """Load zipcode data from a JSON file."""
         try:
-            with open(r"data\tacobell_zipcode_data.json") as f:
+            with open("data/tacobell_zipcode_data.json") as f:
                 return json.load(f)
         except FileNotFoundError:
             self.logger.error("Zipcode data file not found")
@@ -159,6 +170,7 @@ class VerizonSpider(scrapy.Spider):
     
     @staticmethod
     def _get_payload(latitude: float, longitude: float) -> dict:
+        """Get the payload for the request."""
         return {
             "locationCodes": [],
             "longitude": longitude,
@@ -169,3 +181,7 @@ class VerizonSpider(scrapy.Spider):
             "excludeIndirect": False,
             "retrieveBy": "GEO"
         }
+
+    def errback_httpbin(self, failure):
+        """Handle request failures."""
+        self.logger.error(f"Request failed: {failure}")
