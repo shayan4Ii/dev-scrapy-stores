@@ -56,6 +56,7 @@ class VerizonSpider(scrapy.Spider):
                 "phone_number": self._get_phone_number(store),
                 "location": self._get_location(store),
                 "hours": self._get_hours(store),
+                "address": self._get_address(store),
                 "raw_dict": store
             }
         except Exception as e:
@@ -76,6 +77,22 @@ class VerizonSpider(scrapy.Spider):
     def _get_phone_number(store: dict) -> str:
         """Get the store phone number."""
         return store["phoneNumber"]
+
+    def _get_address(self, store: dict[str, Optional[str]]) -> str:
+        """Get the formatted store address."""
+        addr1 = self._get_none_as_empty_string(store.get("address1"))
+        addr2 = self._get_none_as_empty_string(store.get("address2"))
+        city = self._get_none_as_empty_string(store.get("city"))
+        state = self._get_none_as_empty_string(store.get("state"))
+        zipcode = self._get_none_as_empty_string(store.get("zipCode"))
+
+        street_address = f"{addr1}, {addr2}".strip(", ")
+        return f"{street_address}, {city}, {state} {zipcode}"
+    
+    @staticmethod
+    def _get_none_as_empty_string(value: Optional[str]) -> str:
+        """Convert None to an empty string."""
+        return value if value is not None else ""
 
     def _get_location(self, store: dict) -> Optional[dict[str, Union[str, list[float]]]]:
         """Get the store location in GeoJSON Point format."""
