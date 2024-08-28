@@ -39,7 +39,6 @@ class CvsSpider(scrapy.Spider):
                     meta={'page': 1, 'zipcode': zipcode},
                     dont_filter=True
                 )
-                break
         except Exception as e:
             self.logger.error(f"Error in parse method: {e}", exc_info=True)
 
