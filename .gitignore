@@ -117,3 +117,4 @@ scrape_progress.db
 *.db
 scrapy_command
 ai_improve_command.txt
+improvement_temp.txt
