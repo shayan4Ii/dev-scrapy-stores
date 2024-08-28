@@ -5,9 +5,6 @@ from typing import Generator, Dict, Any
 import scrapy
 from scrapy.http import Response
 from scrapy.exceptions import DropItem
-from scrapy.loader import ItemLoader
-from itemloaders.processors import TakeFirst, MapCompose
-from scrapy_store_scrapers.items import MetrobytStoreItem
 
 class MetrobytSpider(scrapy.Spider):
     name = "metrobyt"
@@ -46,10 +43,7 @@ class MetrobytSpider(scrapy.Spider):
             yield response.follow(link, callback=self.parse_store)
             break  # Remove this line to scrape all stores
 
-    def parse_store(self, response: Response) -> MetrobytStoreItem:
-        loader = ItemLoader(item=MetrobytStoreItem(), response=response)
-        loader.default_output_processor = TakeFirst()
-
+    def parse_store(self, response: Response) -> Dict[str, Any]:
         script_text = self.clean_text(response.xpath(self.SCRIPT_TEXT_XPATH).get())
 
         if not script_text:
@@ -65,21 +59,21 @@ class MetrobytSpider(scrapy.Spider):
         
         formatted_address = self._format_address(store_raw_dict["address"]["streetAddress"])
 
-        loader.add_value('address', formatted_address)
-        loader.add_value('phone_number', store_raw_dict["telephone"])
-
         geo_info = store_raw_dict["geo"]
-        loader.add_value('location', {
+        location = {
             'type': 'Point',
-            'coordinates': [geo_info['longitude'], geo_info['latitude']]
-        })
+            'coordinates': [float(geo_info['longitude']), float(geo_info['latitude'])]
+        }
         
         hours_dict = self.parse_hours(store_raw_dict["openingHoursSpecification"])
-        loader.add_value('hours', hours_dict)
 
-        loader.add_value('raw_dict', store_raw_dict)
-
-        return loader.load_item()
+        return {
+            'address': formatted_address,
+            'phone_number': store_raw_dict["telephone"],
+            'location': location,
+            'hours': hours_dict,
+            'raw_dict': store_raw_dict
+        }
 
     def _format_address(self, street_address: str) -> str:
         """Format the street address."""
