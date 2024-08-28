@@ -1,6 +1,6 @@
 import scrapy
 import json
-from typing import Dict, Any, Iterator, Set
+from typing import Dict, Any, Iterator, Set, Union
 
 
 class CvsSpider(scrapy.Spider):
@@ -13,7 +13,6 @@ class CvsSpider(scrapy.Spider):
     
     custom_settings: Dict[str, Any] = {
         'CONCURRENT_REQUESTS': 32,
-        # 'DOWNLOAD_DELAY': 1,
     }
 
     def __init__(self, *args, **kwargs):
@@ -23,22 +22,19 @@ class CvsSpider(scrapy.Spider):
     def start_requests(self) -> Iterator[scrapy.Request]:
         """Generate initial requests for each zipcode."""
         # Read zipcodes from JSON file
-        with open('zipcodes.json', 'r') as f:
-            zipcodes_data = json.load(f)
 
-        for city_data in zipcodes_data:
-            city = city_data['city']
-            state = city_data['state']
-            for zipcode in city_data['zip_codes']:
-                self.logger.info(f"Fetching stores in {city}, {state}, {zipcode}")
-                url = f"https://www.cvs.com/api/locator/v2/stores/search?searchBy=USER-TEXT&latitude=&longitude=&searchText={zipcode}&searchRadiusInMiles=&maxItemsInResult=&filters=&resultsPerPage={self.RESULTS_PER_PAGE}&pageNum=1"
-                yield scrapy.Request(
-                    url,
-                    self.parse,
-                    headers=self.get_headers(),
-                    meta={'page': 1, 'zipcode': zipcode},
-                    dont_filter=True
-                )
+        zipcodes_data = self._load_zipcode_data()
+
+        for zipcode_data in zipcodes_data:
+            zipcode = zipcode_data['zipcode']
+            url = f"https://www.cvs.com/api/locator/v2/stores/search?searchBy=USER-TEXT&latitude=&longitude=&searchText={zipcode}&searchRadiusInMiles=&maxItemsInResult=&filters=&resultsPerPage={self.RESULTS_PER_PAGE}&pageNum=1"
+            yield scrapy.Request(
+                url,
+                self.parse,
+                headers=self.get_headers(),
+                meta={'page': 1, 'zipcode': zipcode},
+                dont_filter=True
+            )
 
     def parse(self, response: scrapy.http.Response) -> Iterator[Dict[str, Any]]:
         """Parse the JSON response and yield store data."""
@@ -90,3 +86,15 @@ class CvsSpider(scrapy.Spider):
             "Referer": "https://www.cvs.com/store-locator/landing",
             "Referrer-Policy": "origin-when-cross-origin"
         }
+    
+    def _load_zipcode_data(self) -> list[dict[str, Union[str, float]]]:
+        """Load zipcode data from a JSON file."""
+        try:
+            with open("data/tacobell_zipcode_data.json") as f:
+                return json.load(f)
+        except FileNotFoundError:
+            self.logger.error("Zipcode data file not found")
+            return []
+        except json.JSONDecodeError:
+            self.logger.error("Invalid JSON in zipcode data file")
+            return []
