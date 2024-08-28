@@ -19,6 +19,10 @@ class MetrobytSpider(scrapy.Spider):
     STORE_LINKS_XPATH = "//a[@class='lm-state__store']/@href"
     SCRIPT_TEXT_XPATH = "//script[@type='application/ld+json']/text()"
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.branch_codes = set()
+
     def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
         """Parse the main page and follow links to individual state pages."""
         state_links = response.xpath(self.STATE_LINKS_XPATH).getall()
@@ -40,6 +44,7 @@ class MetrobytSpider(scrapy.Spider):
 
         for link in store_links:
             yield response.follow(link, callback=self.parse_store)
+            break  # Remove this line to scrape all stores
 
     def parse_store(self, response: Response) -> MetrobytStoreItem:
         loader = ItemLoader(item=MetrobytStoreItem(), response=response)
@@ -51,8 +56,16 @@ class MetrobytSpider(scrapy.Spider):
             raise DropItem(f"No script text found on {response.url}")
         
         store_raw_dict = json.loads(script_text)
+
+        branch_code = store_raw_dict["branchCode"]
+        if branch_code in self.branch_codes:
+            raise DropItem(f"Duplicate store with branch code {branch_code}")
         
-        loader.add_value('address', store_raw_dict["address"]["streetAddress"], MapCompose(lambda x: x.replace("\n", " ")))
+        self.branch_codes.add(branch_code)
+        
+        formatted_address = self._format_address(store_raw_dict["address"]["streetAddress"])
+
+        loader.add_value('address', formatted_address)
         loader.add_value('phone_number', store_raw_dict["telephone"])
 
         geo_info = store_raw_dict["geo"]
@@ -64,7 +77,16 @@ class MetrobytSpider(scrapy.Spider):
         hours_dict = self.parse_hours(store_raw_dict["openingHoursSpecification"])
         loader.add_value('hours', hours_dict)
 
+        loader.add_value('raw_dict', store_raw_dict)
+
         return loader.load_item()
+
+    def _format_address(self, street_address: str) -> str:
+        """Format the street address."""
+        street_address = ", ".join(street_address.rsplit("\n", 1))
+        street_address = street_address.replace("\n", " ")
+
+        return self.clean_text(street_address)
 
     @staticmethod
     def parse_hours(hours_info_list: list[str]) -> Dict[str, Dict[str, str]]:
