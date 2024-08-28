@@ -131,12 +131,16 @@ class CvsSpider(scrapy.Spider):
 
     def _get_address(self, store_address_info: dict) -> str:
         """Get the formatted store address."""
-        return ", ".join(filter(None, [
-            store_address_info.get("street", ""),
-            store_address_info.get("city", ""),
-            store_address_info.get("state", ""),
-            store_address_info.get("zip", "")
-        ]))
+        street = store_address_info.get("street", "")
+        city = store_address_info.get("city", "")
+        state = store_address_info.get("state", "")
+        zipcode = store_address_info.get("zip", "")
+
+        # Combine city, state, and ZIP without a comma between state and ZIP
+        city_state_zip = f"{city}, {state} {zipcode}".strip()
+
+        # Combine all parts, filtering out any empty strings
+        return ", ".join(filter(None, [street, city_state_zip]))
 
     def _extract_api_key(self, response: scrapy.http.Response) -> str:
         """Extract the API key from the response."""
