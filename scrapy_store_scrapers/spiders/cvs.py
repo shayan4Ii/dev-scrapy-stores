@@ -80,34 +80,55 @@ class CvsSpider(scrapy.Spider):
         """Get the store number."""
         return store_info.get("storeId", "")
 
-    @staticmethod
-    def _get_phone_number(store_info: dict) -> Optional[str]:
-        """Get the store phone number."""
+    def _get_phone_number(self, store_info: dict) -> Optional[str]:
+        """Get the store phone number based on priority."""
         phone_numbers = store_info.get("phoneNumbers", [])
-        if phone_numbers and 'pharmacy' in phone_numbers[0]:
-            return phone_numbers[0]['pharmacy']
+        if not phone_numbers:
+            return None
+
+        if isinstance(phone_numbers[0], dict):
+            return self._get_prioritized_phone_number(phone_numbers[0])
+        elif isinstance(phone_numbers[0], str):
+            return phone_numbers[0]
         return None
 
+    @staticmethod
+    def _get_prioritized_phone_number(phone_dict: dict) -> Optional[str]:
+        """Get phone number based on priority: pharmacy > retail > any other."""
+        for key in ['pharmacy', 'retail']:
+            if key in phone_dict:
+                return phone_dict[key]
+        return next(iter(phone_dict.values()), None)
+
     def _get_hours(self, store: dict) -> dict:
-        """Get the store hours."""
+        """Get the store hours based on priority."""
+        dep_hours = store.get("hours", {}).get("departments", [])
+        
+        for priority in ["pharmacy", "retail"]:
+            hours = self._get_department_hours(dep_hours, priority)
+            if hours:
+                return hours
+        
+        # If no pharmacy or retail hours found, use hours from any other department
+        return self._get_department_hours(dep_hours)
+
+    def _get_department_hours(self, dep_hours: list, department_name: Optional[str] = None) -> dict:
+        """Get hours for a specific department or any department if name is None."""
         day_name_map = {
             "SUN": "sunday", "MON": "monday", "TUE": "tuesday",
             "WED": "wednesday", "THU": "thursday", "FRI": "friday", "SAT": "saturday"
         }
 
-        hours = {}
-        dep_hours = store.get("hours", {}).get("departments", [])
         for dep in dep_hours:
-            if dep.get("name") == "pharmacy":
-                for day_hours in dep.get("regHours", []):
-                    day = day_hours.get("weekday")
-                    full_day_name = day_name_map.get(day, day)
-                    hours[full_day_name] = {
+            if department_name is None or dep.get("name") == department_name:
+                return {
+                    day_name_map.get(day_hours.get("weekday"), day_hours.get("weekday")): {
                         "open": day_hours.get("startTime", "").lower(),
                         "close": day_hours.get("endTime", "").lower()
                     }
-                break
-        return hours
+                    for day_hours in dep.get("regHours", [])
+                }
+        return {}
 
     def _get_location(self, store_info: dict) -> Optional[dict]:
         """Get the store location in GeoJSON Point format."""
