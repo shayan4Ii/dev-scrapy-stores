@@ -95,7 +95,7 @@ class MetrobytSpider(scrapy.Spider):
                 "phone_number": phone_number,
                 "location": location,
                 "hours": hours,
-                "raw_data": store_data
+                "raw_dict": store_data
             }
         except Exception as e:
             self.logger.error(f"Error extracting store info from {url}: {e}")
