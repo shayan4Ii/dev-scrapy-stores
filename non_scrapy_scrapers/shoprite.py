@@ -1,19 +1,25 @@
-import requests
 import json
 import logging
 import re
-from typing import Dict, List, Optional, Any
+from datetime import datetime
+from typing import Any, Generator, Optional
+
+import requests
 from parsel import Selector
 
 class ShopRiteScraper:
+    """A scraper for ShopRite store information."""
+
     BASE_URL = "https://www.shoprite.com/sm/pickup/rsid/3000/store/"
 
     def __init__(self):
+        """Initialize the ShopRiteScraper."""
         self.url = self.BASE_URL
         self.logger = self._setup_logger()
         self.session = self._setup_session()
 
-    def _setup_logger(self):
+    def _setup_logger(self) -> logging.Logger:
+        """Set up and configure the logger."""
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.INFO)
         handler = logging.StreamHandler()
@@ -22,7 +28,8 @@ class ShopRiteScraper:
         logger.addHandler(handler)
         return logger
 
-    def _setup_session(self):
+    def _setup_session(self) -> requests.Session:
+        """Set up and configure the requests session."""
         session = requests.Session()
         session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -39,14 +46,15 @@ class ShopRiteScraper:
         })
         return session
 
-    def fetch_and_parse_data(self) -> Optional[Dict[str, Any]]:
+    def fetch_and_parse_data(self) -> Optional[dict[str, Any]]:
+        """Fetch and parse data from the ShopRite website."""
         self.logger.info(f"Fetching data from {self.url}")
         try:
             response = self.session.get(self.url)
             response.raise_for_status()
             
-            sel = Selector(response.text)
-            script = sel.xpath('//script[contains(., "window.__PRELOADED_STATE__=")]/text()').get()
+            selector = Selector(response.text)
+            script = selector.xpath('//script[contains(., "window.__PRELOADED_STATE__=")]/text()').get()
             
             if not script:
                 self.logger.error("Could not find the __PRELOADED_STATE__ data")
@@ -58,15 +66,13 @@ class ShopRiteScraper:
             return data
         except requests.RequestException as e:
             self.logger.error(f"An error occurred while fetching the page: {e}")
-            return None
         except json.JSONDecodeError as e:
             self.logger.error(f"JSON decoding error: {e}")
-            return None
         except Exception as e:
             self.logger.error(f"Unexpected error in fetch_and_parse_data method: {e}", exc_info=True)
-            return None
+        return None
 
-    def extract_store_info(self, raw_store_data: dict) -> dict:
+    def extract_store_info(self, raw_store_data: dict) -> dict[str, Any]:
         """Extract relevant store information from raw data."""
         try:
             store_data = {
@@ -109,7 +115,7 @@ class ShopRiteScraper:
             self.logger.error(f"Error formatting address: {e}", exc_info=True)
             return ""
 
-    def _get_location(self, raw_store_data: dict) -> dict:
+    def _get_location(self, raw_store_data: dict) -> dict[str, Any]:
         """Get the store location in GeoJSON Point format."""
         try:
             latitude = raw_store_data.get('latitude')
@@ -138,7 +144,7 @@ class ShopRiteScraper:
         """Normalize the hours text by removing non-alphanumeric characters and converting to lowercase."""
         return re.sub(r'[^a-z0-9:]', '', hours_text.lower().replace('to', ''))
 
-    def _get_hours(self, raw_store_data: dict) -> dict:
+    def _get_hours(self, raw_store_data: dict) -> dict[str, dict[str, str]]:
         """Extract and parse store hours."""
         try:
             hours = raw_store_data.get("openingHours", "")
@@ -152,7 +158,8 @@ class ShopRiteScraper:
             self.logger.error(f"Error getting store hours: {e}", exc_info=True)
             return {}
 
-    def _parse_business_hours(self, input_text: str) -> Dict[str, Dict[str, str]]:
+    def _parse_business_hours(self, input_text: str) -> dict[str, dict[str, str]]:
+        """Parse business hours from input text."""
         DAY_MAPPING = {
             'sun': 'sunday', 'mon': 'monday', 'tue': 'tuesday', 'wed': 'wednesday',
             'thu': 'thursday', 'fri': 'friday', 'sat': 'saturday',
@@ -197,7 +204,8 @@ class ShopRiteScraper:
 
         return result
 
-    def _extract_business_hour_range(self, input_string: str) -> List[tuple[str, str, str, str]]:
+    def _extract_business_hour_range(self, input_string: str) -> list[tuple[str, str, str, str]]:
+        """Extract business hour ranges from input string."""
         days_re = r"(?:mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)"
         day_suffix_re = r"(?:day)?"
         optional_colon_re = r"(?::)?"
@@ -223,7 +231,8 @@ class ShopRiteScraper:
         
         return results
 
-    def _extract_business_hours(self, input_string: str) -> List[tuple[str, str, str]]:
+    def _extract_business_hours(self, input_string: str) -> list[tuple[str, str, str]]:
+        """Extract individual business hours from input string."""
         days_re = r"(?:mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)"
         day_suffix_re = r"(?:day)?"
         optional_colon_re = r"(?::)?"
@@ -241,34 +250,41 @@ class ShopRiteScraper:
         
         return results
 
-    def scrape_stores(self) -> List[Dict[str, Any]]:
+    def scrape_stores(self) -> Generator[dict[str, Any], None, None]:
+        """Scrape store information and yield each store's data."""
         self.logger.info("Starting to scrape stores")
         data = self.fetch_and_parse_data()
         if not data:
-            return []
+            return
 
-        stores = []
         all_stores = data.get('stores', {}).get('availablePlanningStores', {}).get('items', [])
         
         for store_data in all_stores:
-            store = self.extract_store_info(store_data)
-            stores.append(store)
-        
-        self.logger.info(f"Scraped {len(stores)} stores")
-        return stores
+            try:
+                store = self.extract_store_info(store_data)
+                yield store
+            except Exception as e:
+                self.logger.error(f"Error processing store data: {e}", exc_info=True)
 
-    def save_to_file(self, stores: List[Dict[str, Any]], filename: str = 'data/shoprite_stores.json'):
-        with open(filename, 'w') as f:
-            json.dump(stores, f, indent=2)
-        self.logger.info(f"Saved {len(stores)} stores to {filename}")
+        self.logger.info("Finished scraping stores")
+
+    def save_to_file(self, stores: list[dict[str, Any]], filename: Optional[str] = None) -> None:
+        """Save scraped store data to a JSON file."""
+        if filename is None:
+            current_date = datetime.now().strftime("%Y%m%d")
+            filename = f'data/shoprite-{current_date}.json'
+        
+        try:
+            with open(filename, 'w') as f:
+                json.dump(stores, f, indent=2)
+            self.logger.info(f"Saved {len(stores)} stores to {filename}")
+        except IOError as e:
+            self.logger.error(f"Error saving data to file: {e}", exc_info=True)
 
 def main():
+    """Main function to run the ShopRite scraper."""
     scraper = ShopRiteScraper()
-    stores = scraper.scrape_stores()
-    
-    # Print the scraped stores
-    # for store in stores:
-    #     print(json.dumps(store, indent=2))
+    stores = list(scraper.scrape_stores())
 
     # Save to file
     scraper.save_to_file(stores)
