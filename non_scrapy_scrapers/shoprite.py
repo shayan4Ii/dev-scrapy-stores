@@ -129,14 +129,14 @@ class ShopRiteScraper:
         return {}
 
     @staticmethod
-    def normalize_hours_text(hours_text: str) -> str:
-        """Normalize the hours text by removing non-alphanumeric characters and converting to lowercase."""
-        return re.sub(r'[^a-z0-9]', '', hours_text.lower().replace('to', ''))
-
-    @staticmethod
     def format_time(time_str: str) -> str:
         """Add a space before 'am' or 'pm' if not present."""
         return re.sub(r'(\d+)([ap]m)', r'\1 \2', time_str)
+
+    @staticmethod
+    def normalize_hours_text(hours_text: str) -> str:
+        """Normalize the hours text by removing non-alphanumeric characters and converting to lowercase."""
+        return re.sub(r'[^a-z0-9:]', '', hours_text.lower().replace('to', ''))
 
     def _get_hours(self, raw_store_data: dict) -> dict:
         """Extract and parse store hours."""
@@ -147,34 +147,99 @@ class ShopRiteScraper:
                 return {}
 
             normalized_hours = self.normalize_hours_text(hours)
-            return self._parse_hours(normalized_hours)
+            return self._parse_business_hours(normalized_hours)
         except Exception as e:
             self.logger.error(f"Error getting store hours: {e}", exc_info=True)
             return {}
 
-    def _parse_hours(self, hours_text: str) -> dict:
-        """Parse normalized hours text into a structured format."""
-        try:
-            mon_sat_sun_pattern = r"mon(?:day)?-?sat(?:urday)?([\d]+\s?(?:am|pm))([\d]+\s?(?:am|pm))sun(?:day)?([\d]+\s?(?:am|pm))([\d]+\s?(?:am|pm))"
-            all_week_pattern = r"mon(?:day)?-?sun(?:day)?([\d]+\s?(?:am|pm))([\d]+\s?(?:am|pm))"
+    def _parse_business_hours(self, input_text: str) -> Dict[str, Dict[str, str]]:
+        DAY_MAPPING = {
+            'sun': 'sunday', 'mon': 'monday', 'tue': 'tuesday', 'wed': 'wednesday',
+            'thu': 'thursday', 'fri': 'friday', 'sat': 'saturday',
+        }
+        result = {day: {'open': None, 'close': None} for day in DAY_MAPPING.values()}
 
-            mon_sat_sun_match = re.search(mon_sat_sun_pattern, hours_text)
-            all_week_match = re.search(all_week_pattern, hours_text)
+        if input_text == "open24hours":
+            return {day: {'open': '12:00 am', 'close': '11:59 pm'} for day in DAY_MAPPING.values()}
+        elif 'open24hours' in input_text:
+            input_text = input_text.replace('open24hours', '12:00am11:59pm')
 
-            if mon_sat_sun_match:
-                mon_sat_open, mon_sat_close, sun_open, sun_close = map(self.format_time, mon_sat_sun_match.groups())
-                weekday_hours = {"open": mon_sat_open, "close": mon_sat_close}
-                sunday_hours = {"open": sun_open, "close": sun_close}
-            elif all_week_match:
-                all_days_open, all_days_close = map(self.format_time, all_week_match.groups())
-                weekday_hours = sunday_hours = {"open": all_days_open, "close": all_days_close}
-            else:
-                raise ValueError("Invalid input format")
+        # Extract and process day ranges
+        day_ranges = self._extract_business_hour_range(input_text)
+        for start_day, end_day, open_time, close_time in day_ranges:
+            start_index = list(DAY_MAPPING.keys()).index(start_day)
+            end_index = list(DAY_MAPPING.keys()).index(end_day)
+            if end_index < start_index:  # Handle cases like "Saturday to Sunday"
+                end_index += 7
+            for i in range(start_index, end_index + 1):
+                day = list(DAY_MAPPING.keys())[i % 7]
+                full_day = DAY_MAPPING[day]
+                if result[full_day]['open'] and result[full_day]['close']:
+                    self.logger.debug(f"Day {full_day} already has hours({input_text=}), skipping range {start_day} to {end_day}")
+                    continue
+                result[full_day]['open'] = open_time
+                result[full_day]['close'] = close_time
 
-            return {day: weekday_hours for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]} | {"sunday": sunday_hours}
-        except Exception as e:
-            self.logger.error(f"Error parsing hours: {e}", exc_info=True)
-            return {}
+        # Extract and process individual days (overwriting any conflicting day ranges)
+        single_days = self._extract_business_hours(input_text)
+        for day, open_time, close_time in single_days:
+            full_day = DAY_MAPPING[day]
+            if result[full_day]['open'] and result[full_day]['close']:
+                self.logger.debug(f"Day {full_day} already has hours({input_text=}), skipping individual day {day}")
+                continue
+            result[full_day]['open'] = open_time
+            result[full_day]['close'] = close_time
+
+        # Log warning for any missing days
+        for day, hours in result.items():
+            if hours['open'] is None or hours['close'] is None:
+                self.logger.warning(f"Missing hours for {day}({input_text=})")
+
+        return result
+
+    def _extract_business_hour_range(self, input_string: str) -> List[tuple[str, str, str, str]]:
+        days_re = r"(?:mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)"
+        day_suffix_re = r"(?:day)?"
+        optional_colon_re = r"(?::)?"
+        time_re = r"(\d{1,2}(?::\d{2})?)([ap]m)"
+        
+        if "daily" in input_string:
+            time_match = re.search(f"{time_re}{time_re}", input_string)
+            if time_match:
+                open_time = f"{time_match.group(1)} {time_match.group(2)}"
+                close_time = f"{time_match.group(3)} {time_match.group(4)}"
+                return [("sun", "sat", open_time, close_time)]
+        
+        pattern = f"({days_re}{day_suffix_re})({days_re}{day_suffix_re}){optional_colon_re}?{time_re}{time_re}"
+        matches = re.finditer(pattern, input_string, re.MULTILINE)
+        
+        results = []
+        for match in matches:
+            start_day = match.group(1)[:3]
+            end_day = match.group(2)[:3]
+            open_time = f"{match.group(3)} {match.group(4)}"
+            close_time = f"{match.group(5)} {match.group(6)}"
+            results.append((start_day, end_day, open_time, close_time))
+        
+        return results
+
+    def _extract_business_hours(self, input_string: str) -> List[tuple[str, str, str]]:
+        days_re = r"(?:mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)"
+        day_suffix_re = r"(?:day)?"
+        optional_colon_re = r"(?::)?"
+        time_re = r"(\d{1,2}(?::\d{2})?)([ap]m)"
+        
+        pattern = f"({days_re}{day_suffix_re}){optional_colon_re}?{time_re}{time_re}"
+        matches = re.finditer(pattern, input_string, re.MULTILINE)
+        
+        results = []
+        for match in matches:
+            day = match.group(1)[:3]
+            open_time = f"{match.group(2)} {match.group(3)}"
+            close_time = f"{match.group(4)} {match.group(5)}"
+            results.append((day, open_time, close_time))
+        
+        return results
 
     def scrape_stores(self) -> List[Dict[str, Any]]:
         self.logger.info("Starting to scrape stores")
@@ -202,8 +267,8 @@ def main():
     stores = scraper.scrape_stores()
     
     # Print the scraped stores
-    for store in stores:
-        print(json.dumps(store, indent=2))
+    # for store in stores:
+    #     print(json.dumps(store, indent=2))
 
     # Save to file
     scraper.save_to_file(stores)
