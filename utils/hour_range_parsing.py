@@ -85,7 +85,7 @@ def parse_business_hours(input_text: str) -> Dict[str, Dict[str, str]]:
         for i in range(start_index, end_index + 1):
             day = list(DAY_MAPPING.keys())[i % 7]
             full_day = DAY_MAPPING[day]
-            if result[full_day]['open'] and result[full_day]['close']:
+            if result[full_day]['open'] and result[full_day]['close'] and end_index < 7:
                 # If day already has hours, skip this range
                 print(f"Day {full_day} already has hours, skipping range {start_day} to {end_day}")
                 continue
