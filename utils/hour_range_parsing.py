@@ -42,6 +42,11 @@ def extract_business_hours(input_string: str) -> List[Tuple[str, str, str]]:
 def extract_business_hour_range(input_string: str) -> List[Tuple[str, str, str, str]]:
     normalized_input = normalize_hours_text(input_string)
     
+    if normalized_input == "open24hours":
+        return [("sun", "sat", "12:00 am", "11:59 pm")]
+    elif 'open24hours' in normalized_input:
+        normalized_input = normalized_input.replace('open24hours', '12:00am11:59pm')
+
     # Regex components
     days = r"(?:mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)"
     day_suffix = r"(?:day)?"
@@ -104,22 +109,22 @@ def parse_business_hours(input_text: str) -> Dict[str, Dict[str, str]]:
 #     "Monday & Tuesday 9 am-8 pm; Wednesday to Saturday 9 am-9 pm; Sunday 11 am-6 pm",
 # ]
 examples = [
-    # "Sunday - Saturday: Open 24 hours",
-    # "Monday - Sunday: Open 24 hours",
-    # "Open 24 hours",
-    "Sunday - Saturday: 6 AM - 10 PM",
-    "Sunday - Saturday: 7 AM - 11 PM",
-    "Sunday - Saturday: 6 AM - 12 AM",
+    "Sunday - Saturday: Open 24 hours",
+    "Monday - Sunday: Open 24 hours",
+    "Open 24 hours",
+    # "Sunday - Saturday: 6 AM - 10 PM",
+    # "Sunday - Saturday: 7 AM - 11 PM",
+    # "Sunday - Saturday: 6 AM - 12 AM",
     # "6 am to 12 am daily",
-    "Sunday - Saturday: 7 AM - 9 PM",
-    "Sunday - Saturday: 6:30 AM - 11 PM",
+    # "Sunday - Saturday: 7 AM - 9 PM",
+    # "Sunday - Saturday: 6:30 AM - 11 PM",
     # "7am-11pm daily",
-    "Monday - Saturday: 7 AM - 11 PM\nSunday: 7 AM - 9 PM",
-    "Monday - Saturday: 6 AM - 10 PM\nSunday: 6 AM - 9 PM",
-    "Monday - Friday: 7 AM - 12 AM\nSaturday - Sunday: 6 AM - 12 AM",
-    "Monday - Saturday: 6 AM - 12 AM\nSunday: 6 AM - 10 PM",
-    "Monday -Thursday 9 am - 9 pm;\nFriday - Saturday 9 am -10 pm;\nSun 12 pm-6 pm",
-    "Monday to Saturday 8 am-10 pm (Beer & Wine);\nMonday to Saturday 9 am-10 pm (Spirits);\nSunday 10:45 am-8:45 pm (Beer);\nSunday 12 pm-8:45 pm (Wine & Spirits)"
+    # "Monday - Saturday: 7 AM - 11 PM\nSunday: 7 AM - 9 PM",
+    # "Monday - Saturday: 6 AM - 10 PM\nSunday: 6 AM - 9 PM",
+    # "Monday - Friday: 7 AM - 12 AM\nSaturday - Sunday: 6 AM - 12 AM",
+    # "Monday - Saturday: 6 AM - 12 AM\nSunday: 6 AM - 10 PM",
+    # "Monday -Thursday 9 am - 9 pm;\nFriday - Saturday 9 am -10 pm;\nSun 12 pm-6 pm",
+    # "Monday to Saturday 8 am-10 pm (Beer & Wine);\nMonday to Saturday 9 am-10 pm (Spirits);\nSunday 10:45 am-8:45 pm (Beer);\nSunday 12 pm-8:45 pm (Wine & Spirits)"
 ]
 
 for example in examples:
