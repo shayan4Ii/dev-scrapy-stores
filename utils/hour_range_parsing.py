@@ -12,21 +12,21 @@ DAY_MAPPING = {
     'sat': 'saturday',
 }
 
+# Regular expressions for parsing hours
+days_re = r"(?:mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)"
+day_suffix_re = r"(?:day)?"
+optional_colon_re = r"(?::)?"
+time_re = r"(\d{1,2}(?::\d{2})?)([ap]m)"
+
 def normalize_hours_text(hours_text: str) -> str:
     """Normalize the hours text by removing non-alphanumeric characters and converting to lowercase."""
     return re.sub(r'[^a-z0-9:]', '', hours_text.lower().replace('to', ''))
 
 def extract_business_hours(input_string: str) -> List[Tuple[str, str, str]]:
     normalized_input = normalize_hours_text(input_string)
-    
-    # Regex components
-    days = r"(?:mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)"
-    day_suffix = r"(?:day)?"
-    optional_colon = r"(?::)?"
-    time = r"(\d{1,2}(?::\d{2})?)([ap]m)"
-    
+        
     # Construct the full pattern
-    pattern = f"({days}{day_suffix}){optional_colon}?{time}{time}"
+    pattern = f"({days_re}{day_suffix_re}){optional_colon_re}?{time_re}{time_re}"
     
     matches = re.finditer(pattern, normalized_input, re.MULTILINE)
     
@@ -47,14 +47,18 @@ def extract_business_hour_range(input_string: str) -> List[Tuple[str, str, str, 
     elif 'open24hours' in normalized_input:
         normalized_input = normalized_input.replace('open24hours', '12:00am11:59pm')
 
-    # Regex components
-    days = r"(?:mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)"
-    day_suffix = r"(?:day)?"
-    optional_colon = r"(?::)?"
-    time = r"(\d{1,2}(?::\d{2})?)([ap]m)"
+    if "daily" in normalized_input:
+        
+        # Extract the time range
+        time_match = re.search(f"{time_re}{time_re}", normalized_input)
+        open_time = f"{time_match.group(1)} {time_match.group(2)}"
+        close_time = f"{time_match.group(3)} {time_match.group(4)}"
+        
+        return [("sun", "sat", open_time, close_time)]
+        
     
     # Construct the full pattern
-    pattern = f"({days}{day_suffix})({days}{day_suffix}){optional_colon}?{time}{time}"
+    pattern = f"({days_re}{day_suffix_re})({days_re}{day_suffix_re}){optional_colon_re}?{time_re}{time_re}"
     
     matches = re.finditer(pattern, normalized_input, re.MULTILINE)
     
@@ -112,19 +116,19 @@ examples = [
     "Sunday - Saturday: Open 24 hours",
     "Monday - Sunday: Open 24 hours",
     "Open 24 hours",
-    # "Sunday - Saturday: 6 AM - 10 PM",
-    # "Sunday - Saturday: 7 AM - 11 PM",
-    # "Sunday - Saturday: 6 AM - 12 AM",
-    # "6 am to 12 am daily",
-    # "Sunday - Saturday: 7 AM - 9 PM",
-    # "Sunday - Saturday: 6:30 AM - 11 PM",
-    # "7am-11pm daily",
-    # "Monday - Saturday: 7 AM - 11 PM\nSunday: 7 AM - 9 PM",
-    # "Monday - Saturday: 6 AM - 10 PM\nSunday: 6 AM - 9 PM",
-    # "Monday - Friday: 7 AM - 12 AM\nSaturday - Sunday: 6 AM - 12 AM",
-    # "Monday - Saturday: 6 AM - 12 AM\nSunday: 6 AM - 10 PM",
-    # "Monday -Thursday 9 am - 9 pm;\nFriday - Saturday 9 am -10 pm;\nSun 12 pm-6 pm",
-    # "Monday to Saturday 8 am-10 pm (Beer & Wine);\nMonday to Saturday 9 am-10 pm (Spirits);\nSunday 10:45 am-8:45 pm (Beer);\nSunday 12 pm-8:45 pm (Wine & Spirits)"
+    "Sunday - Saturday: 6 AM - 10 PM",
+    "Sunday - Saturday: 7 AM - 11 PM",
+    "Sunday - Saturday: 6 AM - 12 AM",
+    "6 am to 12 am daily",
+    "Sunday - Saturday: 7 AM - 9 PM",
+    "Sunday - Saturday: 6:30 AM - 11 PM",
+    "7am-11pm daily",
+    "Monday - Saturday: 7 AM - 11 PM\nSunday: 7 AM - 9 PM",
+    "Monday - Saturday: 6 AM - 10 PM\nSunday: 6 AM - 9 PM",
+    "Monday - Friday: 7 AM - 12 AM\nSaturday - Sunday: 6 AM - 12 AM",
+    "Monday - Saturday: 6 AM - 12 AM\nSunday: 6 AM - 10 PM",
+    "Monday -Thursday 9 am - 9 pm;\nFriday - Saturday 9 am -10 pm;\nSun 12 pm-6 pm",
+    "Monday to Saturday 8 am-10 pm (Beer & Wine);\nMonday to Saturday 9 am-10 pm (Spirits);\nSunday 10:45 am-8:45 pm (Beer);\nSunday 12 pm-8:45 pm (Wine & Spirits)"
 ]
 
 for example in examples:
