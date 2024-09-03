@@ -98,7 +98,7 @@ class TacobellSpider(scrapy.Spider):
             store_info['address'] = self._get_address(store.get('address', {}))
             store_info['hours'] = self._get_hours(store.get("openingHours", {}).get("weekDayOpeningList", {}))
             store_info['location'] = self._get_location(store.get('geoPoint', {}))
-            
+            store_info['raw_dict'] = store            
 
             yield store_info
 
