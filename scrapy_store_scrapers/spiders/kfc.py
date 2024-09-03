@@ -4,7 +4,6 @@ from typing import Generator
 
 import scrapy
 from scrapy.http import Response
-from scrapy_store_scrapers.items import KFCStoreItem
 
 class KfcSpider(scrapy.Spider):
     name = "kfc"
@@ -28,6 +27,10 @@ class KfcSpider(scrapy.Spider):
     LATITUDE_XPATH = '//meta[@itemprop="latitude"]/@content'
     LONGITUDE_XPATH = '//meta[@itemprop="longitude"]/@content'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.addresses_scraped = set()
+
     def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
         """
         Parse the main page and follow links to location pages or store pages.
@@ -43,11 +46,11 @@ class KfcSpider(scrapy.Spider):
         else:
             yield self.parse_store(response)
 
-    def parse_store(self, response: Response) -> KFCStoreItem:
+    def parse_store(self, response: Response):
         """
         Parse individual store page and extract store details.
         """
-        item = KFCStoreItem()
+        item = {}
 
         # Extract store name
         item['name'] = self.clean_text(response.xpath('normalize-space(//span[@id="location-name"])').get())
@@ -78,6 +81,8 @@ class KfcSpider(scrapy.Spider):
             item['location'] = None
             self.logger.warning(
                 f"Invalid location data for store: {item['address']}")
+            # Skip store if location data is invalid
+            return 
 
         # Extract and parse hours data
         hours_json = response.xpath(self.HOURS_JSON_XPATH).get()
@@ -111,6 +116,12 @@ class KfcSpider(scrapy.Spider):
                 item['hours'] = None
 
         item['services'] = response.xpath(self.SERVICES).getall()
+
+        address = item['address'].lower().replace(" ", "").replace(",", "")
+        if address in self.addresses_scraped:
+            self.logger.debug(f"Duplicate address found: {item['address']}")
+            return
+        self.addresses_scraped.add(address)
 
         return item
     
