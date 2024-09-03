@@ -45,14 +45,6 @@ class TacobellStoreSpider(scrapy.Spider):
     name = "tacobell_store_spider"
     allowed_domains = ["www.tacobell.com"]
 
-    custom_settings = {
-        'FEEDS': {
-            'store_data.json': {
-                'format': 'json',
-            }
-        }
-    }
-
     STORES_API_URL = "https://www.tacobell.com/tacobellwebservices/v4/tacobell/stores?latitude={}&longitude={}"
 
     def __init__(self, *args, **kwargs):
@@ -66,6 +58,7 @@ class TacobellStoreSpider(scrapy.Spider):
         for entry in zipcode_data:
             url = self.STORES_API_URL.format(entry['latitude'], entry['longitude'])
             yield scrapy.Request(url, self.parse_stores)
+            break
 
     def parse_stores(self, response: Response) -> Generator[Dict[str, Any], None, None]:
         try:
@@ -95,23 +88,20 @@ class TacobellStoreSpider(scrapy.Spider):
 
     @staticmethod
     def format_time(time_str: str) -> str:
-        if isinstance(time_str, str):
-            return re.sub(r'(\d+)([ap]m)', r'\1 \2', time_str)
-        return time_str
+        return re.sub(r'(\d+)([ap]m)', r'\1 \2', time_str)
 
     def _get_hours(self, opening_hours: dict) -> dict:
         hours_info = {}
-        for hours_info in opening_hours:
-            day = hours_info.get('weekDay')
+        for day_hours in opening_hours:
+            day = day_hours.get('weekDay')
 
-            open = self.format_time(hours_info.get('openingTime',{}).get('formattedTime'))
-            close = self.format_time(hours_info.get('closingTime',{}).get('formattedTime'))
+            open = self.format_time(day_hours.get('openingTime',{}).get('formattedHour'))
+            close = self.format_time(day_hours.get('closingTime',{}).get('formattedHour'))
 
             hours_info[day] = {
                 'open': open,
                 'close': close
             }
-
         return hours_info
 
     def _get_address(self, address_info: dict) -> str:
