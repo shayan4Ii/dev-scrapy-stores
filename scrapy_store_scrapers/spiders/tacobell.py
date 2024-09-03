@@ -1,3 +1,4 @@
+import re
 import json
 from typing import Generator, Any, Union
 
@@ -88,5 +89,74 @@ class TacobellSpider(scrapy.Spider):
         except Exception as e:
             self.logger.error(f"Error parsing stores JSON from {response.url}: {e}")
             return
+        
+        for store in stores_data:
+            store_info = {}
 
-        yield from stores_data
+            store_info['number'] = store.get('storeNumber')
+            store_info['phone_number'] = store.get('phoneNumber')
+            store_info['address'] = self._get_address(store.get('address', {}))
+            store_info['hours'] = self._get_hours(store.get("openingHours", {}).get("weekDayOpeningList", {}))
+            store_info['location'] = self._get_location(store.get('geoPoint', {}))
+            
+
+            yield store_info
+
+    @staticmethod
+    def format_time(time_str: str) -> str:
+        """Add a space before 'am' or 'pm' if not present."""
+        return re.sub(r'(\d+)([ap]m)', r'\1 \2', time_str)
+
+    def _get_hours(self, opening_hours: dict) -> dict:
+        hours_info = {}
+        for hours_info in opening_hours:
+            day = hours_info.get('weekDay')
+
+            open = self.format_time(hours_info.get('openingTime',{}).get('formattedTime'))
+            close = self.format_time(hours_info.get('closingTime',{}).get('formattedTime'))
+
+            hours_info[day] = {
+                'open': open,
+                'close': close
+            }
+
+        return hours_info
+
+    def _get_address(self, address_info: dict) -> str:
+        """Get the formatted store address."""
+        try:
+            address_parts = [
+                address_info.get("line1", ""),
+                address_info.get("line2", ""),
+            ]
+            street = ", ".join(filter(None, address_parts))
+
+            city = address_info.get("town", "")
+            state = address_info.get("region", {}).get("isocode", "").replace("US-", "")
+            zipcode = address_info.get("postalCode", "")
+
+            city_state_zip = f"{city}, {state} {zipcode}".strip()
+
+            return ", ".join(filter(None, [street, city_state_zip]))
+        except Exception as e:
+            self.logger.error(f"Error formatting address: {e}", exc_info=True)
+            return ""
+
+    def _get_location(self, loc_info: dict) -> dict:
+        """Get the store location in GeoJSON Point format."""
+        try:
+            latitude = loc_info.get('latitude')
+            longitude = loc_info.get('longitude')
+
+            if latitude is not None and longitude is not None:
+                return {
+                    "type": "Point",
+                    "coordinates": [float(longitude), float(latitude)]
+                }
+            self.logger.warning("Missing latitude or longitude")
+            return {}
+        except ValueError as e:
+            self.logger.warning(f"Invalid latitude or longitude values: {e}")
+        except Exception as e:
+            self.logger.error(f"Error extracting location: {e}", exc_info=True)
+        return {}
