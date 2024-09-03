@@ -1,15 +1,9 @@
 import re
 import json
-from typing import Generator, Any, Union, Dict
+from typing import Generator, Any, Dict
 
 import scrapy
 from scrapy.http import Response
-from scrapy_store_scrapers.items import ZipcodeLongLatItem
-from scrapy.loader import ItemLoader
-from itemloaders.processors import TakeFirst, MapCompose
-
-import json
-import scrapy
 
 class TacobellZipcodeSpider(scrapy.Spider):
     name = "tacobell_zipcode_spider"
@@ -56,13 +50,14 @@ class TacobellStoreSpider(scrapy.Spider):
             'store_data.json': {
                 'format': 'json',
             }
-        },
-        'ITEM_PIPELINES': {
-            'scrapy_store_scrapers.pipelines.TacobellDuplicatesPipeline': 300,
         }
     }
 
     STORES_API_URL = "https://www.tacobell.com/tacobellwebservices/v4/tacobell/stores?latitude={}&longitude={}"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.seen_store_ids = set()
 
     def start_requests(self) -> Generator[scrapy.Request, None, None]:
         with open(r'data\tacobell_zipcode_data.json', 'r') as f:
@@ -71,7 +66,6 @@ class TacobellStoreSpider(scrapy.Spider):
         for entry in zipcode_data:
             url = self.STORES_API_URL.format(entry['latitude'], entry['longitude'])
             yield scrapy.Request(url, self.parse_stores)
-            break
 
     def parse_stores(self, response: Response) -> Generator[Dict[str, Any], None, None]:
         try:
@@ -81,9 +75,16 @@ class TacobellStoreSpider(scrapy.Spider):
             return
         
         for store in stores_data:
-            store_info = {}
+            store_number = store.get('storeNumber')
+            
+            if store_number in self.seen_store_ids:
+                self.logger.info(f"Duplicate store found: {store_number}")
+                continue
+            
+            self.seen_store_ids.add(store_number)
 
-            store_info['number'] = store.get('storeNumber')
+            store_info = {}
+            store_info['number'] = store_number
             store_info['phone_number'] = store.get('phoneNumber')
             store_info['address'] = self._get_address(store.get('address', {}))
             store_info['hours'] = self._get_hours(store.get("openingHours", {}).get("weekDayOpeningList", {}))

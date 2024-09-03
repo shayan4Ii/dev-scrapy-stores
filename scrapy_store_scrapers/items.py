@@ -50,11 +50,6 @@ class TraderjoesStoreItem(Item):
     hours: Dict[str, Dict[str, str]] = Field()
     location: Dict[str, Union[str, List[float]]] = Field()
 
-class ZipcodeLongLatItem(Item):
-    zipcode: str = Field()
-    latitude: float = Field()
-    longitude: float = Field()
-
 class KFCStoreItem(Item):
     name: str = Field()
     address: str = Field()
