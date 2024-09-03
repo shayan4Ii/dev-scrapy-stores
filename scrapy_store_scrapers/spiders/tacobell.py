@@ -58,7 +58,6 @@ class TacobellStoreSpider(scrapy.Spider):
         for entry in zipcode_data:
             url = self.STORES_API_URL.format(entry['latitude'], entry['longitude'])
             yield scrapy.Request(url, self.parse_stores)
-            break
 
     def parse_stores(self, response: Response) -> Generator[Dict[str, Any], None, None]:
         try:
