@@ -76,8 +76,12 @@ class CostcoSpider(scrapy.Spider):
 
             store_info = self.extract_store_info(warehouse)
             
+            if not store_info:
+                self.logger.warning(f"Empty store info for warehouse: {warehouse}")
+                continue
+
             if not all(store_info.get(field) for field in self.required_fields):
-                self.logger.warning(f"Missing required fields for store {store_info['number']}: {store_info}")
+                self.logger.warning(f"Missing required fields for store {store_info.get('number', 'Unknown')}: {store_info}")
                 continue
 
             yield store_info
@@ -86,6 +90,10 @@ class CostcoSpider(scrapy.Spider):
         """Extract and process store information from warehouse data."""
         store_id = warehouse.get('identifier')
         
+        if not store_id:
+            self.logger.warning(f"Missing store identifier in warehouse data: {warehouse}")
+            return {}
+
         if store_id in self.seen_store_ids:
             self.logger.info(f"Duplicate store found: {store_id}")
             return {}
