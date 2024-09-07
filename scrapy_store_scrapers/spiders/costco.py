@@ -58,7 +58,6 @@ class CostcoSpider(scrapy.Spider):
                 callback=self.parse,
                 headers=self.get_default_headers()
             )
-            break
 
     def parse(self, response: Response) -> Generator[dict, None, None]:
         """Parse the response and yield warehouse data."""
