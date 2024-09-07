@@ -1,6 +1,7 @@
 import re
 import json
 from typing import Generator
+from urllib.parse import quote
 
 import scrapy
 from scrapy.http import Response
@@ -11,11 +12,10 @@ class InvalidJsonResponseException(Exception):
 class CostcoSpider(scrapy.Spider):
     name = "costco"
     allowed_domains = ["www.costco.com"]
+            # discard stores which don't have required fields
+    required_fields = ['address', 'location', 'url', 'raw']
     
     custom_settings = {
-        # 'ITEM_PIPELINES': {
-        #     'scrapy_store_scrapers.pipelines.CostcoDuplicatesPipeline': 300,
-        # },
         'CONCURRENT_REQUESTS': 1,
         'RETRY_ENABLED': True,
         'RETRY_TIMES': 3,  # Number of retries
@@ -24,6 +24,10 @@ class CostcoSpider(scrapy.Spider):
     }
 
     API_FORMAT_URL = "https://www.costco.com/AjaxWarehouseBrowseLookupView?langId=-1&numOfWarehouses=50&hasGas=false&hasTires=false&hasFood=false&hasHearing=false&hasPharmacy=false&hasOptical=false&hasBusiness=false&hasPhotoCenter=&tiresCheckout=0&isTransferWarehouse=false&populateWarehouseDetails=true&warehousePickupCheckout=false&latitude={}&longitude={}&countryCode=US"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.seen_store_ids = set()
 
     def start_requests(self) -> Generator[scrapy.Request, None, None]:
         """Read the JSON file containing latitude and longitude data and generate requests."""
@@ -54,6 +58,7 @@ class CostcoSpider(scrapy.Spider):
                 callback=self.parse,
                 headers=self.get_default_headers()
             )
+            break
 
     def parse(self, response: Response) -> Generator[dict, None, None]:
         """Parse the response and yield warehouse data."""
@@ -72,7 +77,17 @@ class CostcoSpider(scrapy.Spider):
                 self.logger.warning("Invalid warehouse data: %s", warehouse)
                 continue
 
-            store_info['number'] = warehouse.get('identifier')
+            warehouse_id = warehouse.get('identifier')
+            
+            if warehouse_id in self.seen_store_ids:
+                self.logger.info(f"Duplicate store found: {warehouse_id}")
+                continue
+            
+            self.seen_store_ids.add(warehouse_id)
+
+
+            store_info['number'] = warehouse_id
+            store_info['name'] = warehouse.get('locationName', '').strip()
 
             store_info['phone_number'] = warehouse.get('phone', '').strip()
             store_info['address'] = self._get_address(warehouse)
@@ -81,9 +96,37 @@ class CostcoSpider(scrapy.Spider):
             store_info['services'] = self._get_services(warehouse)
             store_info['hours'] = self._get_hours(warehouse)
 
-            store_info['raw_dict'] = warehouse
+            store_info['url'] = self._generate_warehouse_url(warehouse)
+
+            store_info['raw'] = warehouse
+
+            # discard stores which don't have required fields
+
+            self.logger.info(f"Store info: {store_info}")
 
             yield store_info
+
+    def _generate_warehouse_url(self, warehouse_dict):
+        base_url = "https://www.costco.com/warehouse-locations/"
+        
+        # Extract and process location name and city
+        location_name = warehouse_dict.get('locationName', '').lower()
+        city = warehouse_dict.get('city', '').lower()
+        location_slug = f"{location_name}-{city}"
+        
+        # Clean the slug (remove special characters and replace spaces with hyphens)
+        location_slug = re.sub(r'[^a-z0-9\s-]', '', location_slug)
+        location_slug = re.sub(r'\s+', '-', location_slug.strip())
+        
+        # Get state and store ID
+        state = warehouse_dict.get('state', '').lower()
+        store_id = warehouse_dict.get('stlocID') or warehouse_dict.get('identifier', '')
+        
+        # Construct the URL
+        url = f"{base_url}{location_slug}-{state}-{store_id}.html"
+        
+        # Ensure the URL is properly encoded
+        return quote(url, safe=':/')
 
     def _get_services(self, store_info: dict) -> list[str]:
         try:
@@ -143,7 +186,7 @@ class CostcoSpider(scrapy.Spider):
         try:
             hours = ' '.join(raw_store_data.get("warehouseHours", []))
             if not hours:
-                self.logger.warning(f"No hours found for store {raw_store_data.get('name', 'Unknown')}")
+                self.logger.warning(f"No hours found for store {raw_store_data}")
                 return {}
 
             normalized_hours = self.normalize_hours_text(hours)
