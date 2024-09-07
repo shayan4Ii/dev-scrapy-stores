@@ -101,8 +101,9 @@ class CostcoSpider(scrapy.Spider):
             store_info['raw'] = warehouse
 
             # discard stores which don't have required fields
-
-            self.logger.info(f"Store info: {store_info}")
+            if not all(store_info.get(field) for field in self.required_fields):
+                self.logger.warning(f"Missing required fields for store {store_info['number']}: {store_info}")
+                continue
 
             yield store_info
 
