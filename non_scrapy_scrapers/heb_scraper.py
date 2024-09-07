@@ -108,6 +108,100 @@ class HEBStoreLocator:
                 else:
                     raise
 
+    def parse_store(self, store: Dict) -> Dict:
+        store_info = {}
+
+        store_info['number'] = str(store.get('storeNumber', ''))
+        store_info['name'] = store.get('name', '')
+        store_info['phone'] = store.get('phoneNumber', '')
+
+        store_info['address'] = self._get_address(store.get('address', {}))
+        store_info['location'] = self._get_location(store)
+        store_info['hours'] = self._get_hours(store.get('storeHours', []))
+        store_info['services'] = self._get_services(store)
+        store_info['url'] = self._get_url(store)
+        store_info['raw'] = store
+
+        return store_info
+
+    def _get_address(self, address_info: dict) -> str:
+        """Format the store address from store information."""
+        try:
+            street = address_info.get("streetAddress", "").strip()
+            city = address_info.get("locality", "").strip()
+            state = address_info.get("region", "").strip()
+            zipcode = address_info.get("postalCode", "").strip()
+
+            city_state_zip = f"{city}, {state} {zipcode}".strip()
+
+            return ", ".join(filter(None, [street, city_state_zip]))
+        except Exception as e:
+            logging.error(f"Error formatting address: {e}", exc_info=True)
+            return ""    
+    
+
+    def _get_location(self, store_info: dict) -> dict:
+        """Extract and format location coordinates."""
+        try:
+            latitude = store_info.get('latitude')
+            longitude = store_info.get('longitude')
+
+            if latitude is not None and longitude is not None:
+                return {
+                    "type": "Point",
+                    "coordinates": [float(longitude), float(latitude)]
+                }
+            self.logger.warning("Missing latitude or longitude")
+            return {}
+        except ValueError as e:
+            self.logger.warning(f"Invalid latitude or longitude values: {e}")
+        except Exception as e:
+            self.logger.error(f"Error extracting location: {e}", exc_info=True)
+        return {}
+
+    def _get_hours(self, week_hours: list) -> dict:
+        hours_info = {}
+
+        for day_info in week_hours:
+            day = day_info.get('day').lower()
+            hours_info[day] = {
+                "open": self.convert_to_12h_format(day_info.get('opens')),
+                "close": self.convert_to_12h_format(day_info.get('closes'))
+            }
+        return hours_info
+    
+    def _get_services(self, store_info: dict) -> list:
+
+        
+
+        return store_info.get('services', [])
+    
+    def _get_url(self, store_info: dict) -> str:
+        # Extract relevant data from the store_info dictionary
+        address = store_info['address']
+        country = address['country']
+        region = address['region'].lower()
+        locality = address['locality'].lower()
+        name = store_info['name']
+        store_number = store_info['storeNumber']
+
+        # Format the store name
+        formatted_store_name = name.lower().replace(' ', '-')
+
+        # Construct the URL
+        base_url = "https://www.heb.com/heb-store"
+        url = f"{base_url}/{country}/{region}/{locality}/{formatted_store_name}-{store_number}"
+
+        return url
+
+    @staticmethod
+    def convert_to_12h_format(time_str: str) -> str:
+        if not time_str:
+            return time_str
+        time_obj = datetime.strptime(time_str, '%H:%M').time()
+        return time_obj.strftime('%I:%M %p').lower()
+
+
     def process_zip_code(self, zip_code: str):
         logging.info(f"Processing ZIP code: {zip_code}")
         page = 1
@@ -126,7 +220,10 @@ class HEBStoreLocator:
                 store = store_data['store']
                 if store['storeNumber'] not in self.store_ids:
                     self.store_ids.add(store['storeNumber'])
-                    self.save_store(store)
+
+                    parsed_store = self.parse_store(store)
+
+                    self.save_store(parsed_store)
                     logging.info(f"Added store: {store['storeNumber']}")
                 else:
                     logging.info(f"Skipped duplicate store: {store['storeNumber']}")
