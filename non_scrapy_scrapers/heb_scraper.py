@@ -32,7 +32,7 @@ class HEBStoreLocator:
     BASE_URL = "https://www.heb.com/store-locations"
     API_URL = "https://www.heb.com/_next/data/{}/store-locations.json"
 
-    def __init__(self, zipcode_file: str = 'zipcodes.json', db_file: str = 'scraper_progress.db', output_file: str = 'data/heb_stores.jsonl'):
+    def __init__(self, zipcode_file: str = 'zipcodes.json', db_file: str = 'scraper_progress.db'):
         self.zip_codes = self.load_zipcodes(zipcode_file)
         self.store_ids = set()
         self.headers = {
@@ -55,10 +55,11 @@ class HEBStoreLocator:
         }
         
         self.db_file = db_file
-        self.output_file = output_file
         self.build_id = None
         self.driver = None
         self.interrupted = False
+        self.output_file = f'data/heb-{datetime.now().strftime("%Y%m%d")}.jsonl'
+        os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
 
         self.init_db()
         signal.signal(signal.SIGINT, self.signal_handler)
@@ -171,10 +172,15 @@ class HEBStoreLocator:
         return hours_info
     
     def _get_services(self, store_info: dict) -> list:
-
+        # areas with pharmacy
+        # for pharmacy area get features
+        for area in store_info.get('areas', []):
+            if area.get('name', '').lower() == 'pharmacy':
+                return [feature.get('name', '') for feature in area.get('features', [])]
+            
+        return []
         
 
-        return store_info.get('services', [])
     
     def _get_url(self, store_info: dict) -> str:
         # Extract relevant data from the store_info dictionary
@@ -264,7 +270,7 @@ class HEBStoreLocator:
         if os.path.exists(self.output_file):
             with jsonlines.open(self.output_file) as reader:
                 for store in reader:
-                    self.store_ids.add(store['storeNumber'])
+                    self.store_ids.add(store['number'])
             logging.info(f"Loaded {len(self.store_ids)} previously saved store IDs")
 
     def get_zipcode_status(self, zipcode):
