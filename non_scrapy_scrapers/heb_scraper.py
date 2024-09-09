@@ -34,23 +34,29 @@ class HEBStoreLocator:
         self.output_file = f'data/heb-{datetime.now().strftime("%Y%m%d")}.jsonl'
         os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
 
-        self.logger = logging.getLogger(__name__)
-        self._setup_logging()
+        self.logger = self._setup_logging()
         self._init_db()
         signal.signal(signal.SIGINT, self._signal_handler)
 
-    def _setup_logging(self):
-        """Set up logging configuration."""
-        self.logger.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        
-        file_handler = logging.FileHandler("logs/heb_store_locator.log")
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
-        
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        self.logger.addHandler(console_handler)
+    def _setup_logging(self) -> logging.Logger:
+        """Set up logging configuration using coloredlogs."""
+        logger = logging.getLogger(__name__)
+
+        # Create logs directory if it doesn't exist
+        log_dir = "logs"
+        os.makedirs(log_dir, exist_ok=True)
+
+        # Set up coloredlogs with a format string that doesn't include 'hostname'
+        coloredlogs.install(level='INFO', logger=logger, fmt='%(asctime)s %(name)s[%(process)d] %(levelname)s %(message)s')
+
+        # Add file handler
+        log_file = os.path.join(log_dir, f"heb_store_locator_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        file_handler = logging.FileHandler(log_file)
+        file_formatter = logging.Formatter('%(asctime)s %(name)s[%(process)d] %(levelname)s %(message)s')
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
+
+        return logger
 
     def _init_db(self):
         """Initialize the SQLite database."""
