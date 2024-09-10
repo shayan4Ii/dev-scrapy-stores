@@ -40,14 +40,12 @@ class RaleysSpider(scrapy.Spider):
             for store in stores:
                 yield self.parse_store(store)
 
-            current_offset = data.get('offset', 0)
-            total_stores = data.get('total', 0)
-            if current_offset < total_stores:
-                new_offset = current_offset + self.rows_per_page
-                new_data = self.get_payload(new_offset)
+            if data['offset'] <= data['total']:
+                url = 'https://www.raleys.com/api/store'
+                new_data = self.get_payload(data['offset'])
                 yield scrapy.Request(
                     method="POST",
-                    url=self.api_url,
+                    url=url,
                     body=json.dumps(new_data),
                     headers={'Content-Type': 'application/json'},
                     callback=self.parse
