@@ -1,5 +1,5 @@
-import re
 import json
+import re
 from typing import Any, Generator
 
 import scrapy
@@ -11,11 +11,12 @@ class WinnDixieSpider(scrapy.Spider):
     name = "winndixie"
     allowed_domains = ["www.winndixie.com"]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the spider with tracking for seen stores and counters."""
         super().__init__(*args, **kwargs)
-        self.seen_store_ids = set()
-        self.duplicate_count = 0
-        self.processed_count = 0
+        self.seen_store_ids: set[str] = set()
+        self.duplicate_count: int = 0
+        self.processed_count: int = 0
 
     def start_requests(self) -> Generator[Request, None, None]:
         """Generate initial requests for the spider."""
@@ -23,12 +24,11 @@ class WinnDixieSpider(scrapy.Spider):
 
         try:
             zipcodes = self.load_zipcodes("zipcodes.json")
-        except (FileNotFoundError, ValueError) as e:
+        except (FileNotFoundError, json.JSONDecodeError) as e:
             self.logger.error(f"Error loading zipcodes: {str(e)}")
             return
-        
+
         for zipcode in zipcodes:
-            zipcode = '33165'
             data = {
                 "search": zipcode,
                 "strDefaultMiles": "25",
@@ -40,25 +40,32 @@ class WinnDixieSpider(scrapy.Spider):
                 headers=self.get_headers(),
                 url=url,
                 body=json.dumps(data),
-                callback=self.parse
+                callback=self.parse,
+                errback=self.errback_httpbin,
+                meta={'zipcode': zipcode}
             )
-            break
 
     def parse(self, response: Response) -> Generator[dict[str, Any], None, None]:
         """Parse the response and yield filtered store data."""
         try:
             stores = response.json()
-            # filtered_stores = self.filter_stores(stores)
             for store in stores:
-                parsed_store = self.parse_store(store)
-                if self.is_duplicate(parsed_store):
-                    self.duplicate_count += 1
-                    self.logger.info(f"Duplicate store found: {parsed_store['number']}")
-                else:
-                    self.processed_count += 1
-                    yield parsed_store
+                try:
+                    parsed_store = self.parse_store(store)
+                    if self.is_duplicate(parsed_store):
+                        self.duplicate_count += 1
+                        self.logger.info(f"Duplicate store found: {parsed_store['number']}")
+                    else:
+                        self.processed_count += 1
+                        yield parsed_store
+                except Exception as e:
+                    self.logger.error(f"Error parsing store: {e}", exc_info=True)
         except json.JSONDecodeError:
-            self.logger.error(f"Failed to parse JSON from response: {response.url}")
+            self.logger.error(f"Failed to parse JSON from response: {response.url}", exc_info=True)
+
+    def errback_httpbin(self, failure):
+        """Log any errors that occur during the request."""
+        self.logger.error(f"Request failed: {failure.value}")
 
     def is_duplicate(self, store: dict[str, Any]) -> bool:
         """Check if the store is a duplicate."""
@@ -73,22 +80,24 @@ class WinnDixieSpider(scrapy.Spider):
         self.seen_store_ids.add(store_id)
         return False
 
-    def parse_store(self, store_info: dict) -> dict[str, Any]:
+    def parse_store(self, store_info: dict[str, Any]) -> dict[str, Any]:
         """Parse the store details from the response."""
-        parsed_store = {}
-        
-        parsed_store['number'] = str(store_info.get('StoreCode'))
-        parsed_store['name'] = store_info.get('StoreName')
-        parsed_store['phone_number'] = store_info.get('Phone')
+        parsed_store = {
+            'number': str(store_info.get('StoreCode')),
+            'name': store_info.get('StoreName'),
+            'phone_number': store_info.get('Phone'),
+            'address': self._get_address(store_info.get('Address', {})),
+            'location': self._get_location(store_info.get('Location', {})),
+            'hours': self._get_hours(store_info),
+            'services': self._get_services(store_info),
+            'url': self._get_url(store_info),
+            'raw': store_info
+        }
 
-        parsed_store['address'] = self._get_address(store_info.get('Address', {}))
-        parsed_store['location'] = self._get_location(store_info.get('Location', {}))
-        parsed_store['hours'] = self._get_hours(store_info)
-        parsed_store['services'] = self._get_services(store_info)
+        for key, value in parsed_store.items():
+            if value is None or (isinstance(value, (dict, list)) and not value):
+                self.logger.warning(f"Missing or empty data for {key} in store {parsed_store['number']}")
 
-        parsed_store['url'] = self._get_url(store_info)
-        parsed_store['raw'] = store_info
-        
         return parsed_store
     
     def _get_services(self, store_info: dict[str, Any]) -> list[str]:
@@ -97,16 +106,15 @@ class WinnDixieSpider(scrapy.Spider):
         return services.split(",") if services else []
 
     @staticmethod
-    def _get_url(store_info):
+    def _get_url(store_info: dict[str, Any]) -> str:
+        """Generate the store's URL."""
         base_url = "https://www.winndixie.com/storedetails"
         city = store_info['Address']['City'].lower()
         state = store_info['Address']['State'].lower()
         zipcode = store_info['Address']['Zipcode']
         store_code = store_info['StoreCode']
         
-        url = f"{base_url}/{city}/{state}?search={store_code}&zipcode={zipcode}"
-        
-        return url
+        return f"{base_url}/{city}/{state}?search={store_code}&zipcode={zipcode}"
 
     @staticmethod
     def format_time(time_str: str) -> str:
@@ -118,7 +126,7 @@ class WinnDixieSpider(scrapy.Spider):
         """Normalize the hours text by removing non-alphanumeric characters and converting to lowercase."""
         return re.sub(r'[^a-z0-9:]', '', hours_text.lower().replace('to', '').replace('thru', ''))
 
-    def _get_hours(self, raw_store_data: dict) -> dict[str, dict[str, str]]:
+    def _get_hours(self, raw_store_data: dict[str, Any]) -> dict[str, dict[str, str]]:
         """Extract and parse store hours."""
         try:
             hours = raw_store_data.get("WorkingHours", "")
@@ -145,38 +153,47 @@ class WinnDixieSpider(scrapy.Spider):
         elif 'open24hours' in input_text:
             input_text = input_text.replace('open24hours', '12:00am11:59pm')
 
-        # Extract and process day ranges
         day_ranges = self._extract_business_hour_range(input_text)
-        for start_day, end_day, open_time, close_time in day_ranges:
-            start_index = list(DAY_MAPPING.keys()).index(start_day)
-            end_index = list(DAY_MAPPING.keys()).index(end_day)
-            if end_index < start_index:  # Handle cases like "Saturday to Sunday"
-                end_index += 7
-            for i in range(start_index, end_index + 1):
-                day = list(DAY_MAPPING.keys())[i % 7]
-                full_day = DAY_MAPPING[day]
-                if result[full_day]['open'] and result[full_day]['close']:
-                    self.logger.debug(f"Day {full_day} already has hours({input_text=}), skipping range {start_day} to {end_day}")
-                    continue
-                result[full_day]['open'] = open_time
-                result[full_day]['close'] = close_time
-
-        # Extract and process individual days (overwriting any conflicting day ranges)
         single_days = self._extract_business_hours(input_text)
-        for day, open_time, close_time in single_days:
-            full_day = DAY_MAPPING[day]
-            if result[full_day]['open'] and result[full_day]['close']:
-                self.logger.debug(f"Day {full_day} already has hours({input_text=}), skipping individual day {day}")
-                continue
-            result[full_day]['open'] = open_time
-            result[full_day]['close'] = close_time
 
-        # Log warning for any missing days
+        self._process_day_ranges(day_ranges, result, DAY_MAPPING)
+        self._process_single_days(single_days, result, DAY_MAPPING)
+
         for day, hours in result.items():
             if hours['open'] is None or hours['close'] is None:
                 self.logger.warning(f"Missing hours for {day}({input_text=})")
 
         return result
+
+    def _process_day_ranges(self, day_ranges: list[tuple[str, str, str, str]], 
+                            result: dict[str, dict[str, str]], 
+                            DAY_MAPPING: dict[str, str]) -> None:
+        """Process day ranges and update the result dictionary."""
+        for start_day, end_day, open_time, close_time in day_ranges:
+            start_index = list(DAY_MAPPING.keys()).index(start_day)
+            end_index = list(DAY_MAPPING.keys()).index(end_day)
+            if end_index < start_index:
+                end_index += 7
+            for i in range(start_index, end_index + 1):
+                day = list(DAY_MAPPING.keys())[i % 7]
+                full_day = DAY_MAPPING[day]
+                if result[full_day]['open'] and result[full_day]['close']:
+                    self.logger.debug(f"Day {full_day} already has hours, skipping range {start_day} to {end_day}")
+                    continue
+                result[full_day]['open'] = open_time
+                result[full_day]['close'] = close_time
+
+    def _process_single_days(self, single_days: list[tuple[str, str, str]], 
+                             result: dict[str, dict[str, str]], 
+                             DAY_MAPPING: dict[str, str]) -> None:
+        """Process single days and update the result dictionary."""
+        for day, open_time, close_time in single_days:
+            full_day = DAY_MAPPING[day]
+            if result[full_day]['open'] and result[full_day]['close']:
+                self.logger.debug(f"Day {full_day} already has hours, skipping individual day {day}")
+                continue
+            result[full_day]['open'] = open_time
+            result[full_day]['close'] = close_time
 
     def _extract_business_hour_range(self, input_string: str) -> list[tuple[str, str, str, str]]:
         """Extract business hour ranges from input string."""
@@ -195,23 +212,19 @@ class WinnDixieSpider(scrapy.Spider):
                 return [("sun", "sat", open_time, close_time)]
         
         time_only_match = re.match(time_only_re, input_string)
-        if re.match(time_only_re, input_string):
+        if time_only_match:
             open_time = f"{time_only_match.group(1)} {time_only_match.group(2)}"
             close_time = f"{time_only_match.group(3)} {time_only_match.group(4)}"
             return [("sun", "sat", open_time, close_time)]
 
         pattern = f"({days_re}{day_suffix_re})({days_re}{day_suffix_re}){optional_colon_re}?{time_re}{time_re}"
-        matches = re.finditer(pattern, input_string, re.MULTILINE)
+        matches = re.finditer(pattern, input_string)
         
-        results = []
-        for match in matches:
-            start_day = match.group(1)[:3]
-            end_day = match.group(2)[:3]
-            open_time = f"{match.group(3)} {match.group(4)}"
-            close_time = f"{match.group(5)} {match.group(6)}"
-            results.append((start_day, end_day, open_time, close_time))
-        
-        return results
+        return [
+            (match.group(1)[:3], match.group(2)[:3], 
+             f"{match.group(3)} {match.group(4)}", f"{match.group(5)} {match.group(6)}")
+            for match in matches
+        ]
 
     def _extract_business_hours(self, input_string: str) -> list[tuple[str, str, str]]:
         """Extract individual business hours from input string."""
@@ -221,16 +234,12 @@ class WinnDixieSpider(scrapy.Spider):
         time_re = r"(\d{1,2}(?::\d{2})?)([ap]m)"
         
         pattern = f"({days_re}{day_suffix_re}){optional_colon_re}?{time_re}{time_re}"
-        matches = re.finditer(pattern, input_string, re.MULTILINE)
+        matches = re.finditer(pattern, input_string)
         
-        results = []
-        for match in matches:
-            day = match.group(1)[:3]
-            open_time = f"{match.group(2)} {match.group(3)}"
-            close_time = f"{match.group(4)} {match.group(5)}"
-            results.append((day, open_time, close_time))
-        
-        return results
+        return [
+            (match.group(1)[:3], f"{match.group(2)} {match.group(3)}", f"{match.group(4)} {match.group(5)}")
+            for match in matches
+        ]
 
     def _get_address(self, address_info: dict[str, Any]) -> str:
         """Get the formatted store address."""
@@ -249,7 +258,7 @@ class WinnDixieSpider(scrapy.Spider):
 
             full_address = ", ".join(filter(None, [street, city_state_zip]))
             if not full_address:
-                self.logger.warning(f"Missing address for store with address {address_info}")
+                self.logger.warning(f"Missing address for store with address info: {address_info}")
             return full_address
         except Exception as error:
             self.logger.error(f"Error formatting address: {error}", exc_info=True)
@@ -266,14 +275,13 @@ class WinnDixieSpider(scrapy.Spider):
                     "type": "Point",
                     "coordinates": [float(longitude), float(latitude)]
                 }
-            self.logger.warning(f"Missing latitude or longitude for store with location info {location_info}")
+            self.logger.warning(f"Missing latitude or longitude for store with location info: {location_info}")
             return {}
         except ValueError as error:
             self.logger.warning(f"Invalid latitude or longitude values: {error}")
         except Exception as error:
             self.logger.error(f"Error extracting location: {error}", exc_info=True)
         return {}
-
 
     @staticmethod
     def load_zipcodes(zipcode_file: str) -> list[str]:
@@ -287,17 +295,6 @@ class WinnDixieSpider(scrapy.Spider):
         return list(zipcodes)
 
     @staticmethod
-    def filter_stores(stores: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Filter stores based on criteria of website to show on frontend."""
-        return [
-            store for store in stores
-            if (
-                'liquor' not in store['Location']['LocationTypeDescription'].lower()
-                or (store['StoreCode'] == '1489' and not store['ParentStore'])
-            )
-        ]
-
-    @staticmethod
     def get_headers() -> dict[str, str]:
         """Return headers for the HTTP request."""
         return {
@@ -307,10 +304,11 @@ class WinnDixieSpider(scrapy.Spider):
             "origin": "https://www.winndixie.com",
             "referer": "https://www.winndixie.com/locator",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-        }
+            }
     
-    def closed(self, reason):
+    def closed(self, reason: str) -> None:
         """Log statistics when the spider closes."""
+        self.logger.info(f"Spider closed: {reason}")
         self.logger.info(f"Processed items: {self.processed_count}")
         self.logger.info(f"Duplicate items dropped: {self.duplicate_count}")
         self.logger.info(f"Unique stores found: {len(self.seen_store_ids)}")
