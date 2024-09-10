@@ -1,21 +1,17 @@
-import scrapy
 from typing import Any, Generator
 
+import scrapy
+
+
 class ElsupermarketsSpider(scrapy.Spider):
-    """
-    Spider for scraping store information from elsupermarkets.com
-    """
+    """Spider for scraping store information from elsupermarkets.com"""
+
     name = "elsupermarkets"
     allowed_domains = ["elsupermarkets.com"]
     start_urls = ["https://elsupermarkets.com/wp-json/elsuper/v1/stores"]
 
-    def parse(self, response: scrapy.http.Response) -> Generator[dict, None, None]:
-        """
-        Parse the JSON response and yield store information with parsed hours
-
-        :param response: The response object from the HTTP request
-        :return: Generator of store dictionaries with parsed hours
-        """
+    def parse(self, response: scrapy.http.Response) -> Generator[dict[str, Any], None, None]:
+        """Parse the JSON response and yield store information."""
         self.logger.info(f"Parsing response from {response.url}")
         try:
             stores = response.json()
@@ -28,91 +24,74 @@ class ElsupermarketsSpider(scrapy.Spider):
                 parsed_store = self.parse_store(store)
                 yield parsed_store
             except Exception as e:
-                self.logger.error(f"Error parsing store: {e}")
+                self.logger.error(f"Error parsing store: {e}", exc_info=True)
 
     def parse_store(self, store: dict[str, Any]) -> dict[str, Any]:
-        """
-        Parse individual store information and add parsed hours
+        """Parse individual store information and add parsed hours."""
+        parsed_store = {
+            "name": store.get("title"),
+            "phone_number": store.get("phone"),
+            "address": self._clean_address(store.get("address", "")),
+            "hours": self._get_hours(store),
+            "services": store.get("services", []),
+            "location": self._get_location(store.get("location", {})),
+            "url": store.get("url"),
+            "raw": store
+        }
 
-        :param store: Dictionary containing store information
-        :return: Store dictionary with added parsed hours
-        """
-        parsed_store = {}
-
-        parsed_store["name"] = store.get("title")
-        parsed_store["phone_number"] = store.get("phone")
-        parsed_store["address"] = store.get("address").replace(', ,', ',').strip()
-
-        parsed_store["hours"] = self._get_hours(store)
-        parsed_store["services"] = store.get("services", [])
-        parsed_store["location"] = self._get_location(store.get("location", {}))
-
-        parsed_store["url"] = store.get("url")
-        parsed_store["raw"] = store
+        for key, value in parsed_store.items():
+            if value is None or (isinstance(value, (list, dict)) and not value):
+                self.logger.warning(f"Missing or empty data for {key}")
 
         return parsed_store
+
+    def _clean_address(self, address: str) -> str:
+        """Clean and format the address string."""
+        return address.replace(", ,", ",").strip()
 
     def _get_location(self, location_info: dict[str, Any]) -> dict[str, Any]:
         """Extract and format location coordinates."""
         try:
-            latitude = location_info.get('lat')
-            longitude = location_info.get('lng')
+            latitude = location_info.get("lat")
+            longitude = location_info.get("lng")
 
             if latitude is not None and longitude is not None:
                 return {
                     "type": "Point",
                     "coordinates": [float(longitude), float(latitude)]
                 }
-            self.logger.warning(f"Missing latitude or longitude for store with location info: {location_info}")
-            return {}
-        except ValueError as error:
-            self.logger.warning(f"Invalid latitude or longitude values: {error}")
-        except Exception as error:
-            self.logger.error(f"Error extracting location: {error}", exc_info=True)
+            self.logger.warning(f"Missing latitude or longitude: {location_info}")
+        except ValueError as e:
+            self.logger.warning(f"Invalid latitude or longitude values: {e}")
+        except Exception as e:
+            self.logger.error(f"Error extracting location: {e}", exc_info=True)
         return {}
 
-
-    def _get_hours(self, store: dict) -> dict:
-        """
-        Parse the store hours from the store data
-
-        :param store: Dictionary containing store information
-        :return: Dictionary of store hours for each day of the week
-        """
+    def _get_hours(self, store: dict[str, Any]) -> dict[str, dict[str, str]]:
+        """Parse the store hours from the store data."""
         hours_range = store.get("hours", "")
-        open_time, close_time = self.get_open_close_times(hours_range)
-        return self.create_hours_dict(open_time, close_time)
-
-    def get_open_close_times(self, hours_range: str) -> tuple[str, str]:
-        """
-        Parse the open and close times from the hours range string
-
-        :param hours_range: Hours range string
-        :return: Tuple of open and close times
-        """
         if not hours_range:
-            self.logger.warning(f"No hours found for store with hours: {hours_range}")
-            return
+            self.logger.warning(f"No hours found for store: {store.get('title', 'Unknown')}")
+            return {}
 
+        open_time, close_time = self._parse_hours_range(hours_range)
+        return self._create_hours_dict(open_time, close_time)
+
+    def _parse_hours_range(self, hours_range: str) -> tuple[str, str]:
+        """Parse the open and close times from the hours range string."""
         hours_range = hours_range.lower()
         try:
-            open_time, close_time = hours_range.split("-")
-            open_time = open_time.strip()
-            close_time = close_time.strip()
+            open_time, close_time = map(str.strip, hours_range.split("-"))
+            return open_time, close_time
         except ValueError:
-            self.logger.error(f"Invalid hours format for store with hours: {hours_range}")
-        
-        return open_time, close_time
+            self.logger.error(f"Invalid hours format: {hours_range}")
+            return "", ""
 
     @staticmethod
-    def create_hours_dict(open_time: str, close_time: str) -> dict[str, dict[str, str]]:
-        """
-        Create a dictionary of store hours for each day of the week
-
-        :param open_time: Opening time string
-        :param close_time: Closing time string
-        :return: Dictionary of store hours for each day
-        """
+    def _create_hours_dict(open_time: str, close_time: str) -> dict[str, dict[str, str]]:
+        """Create a dictionary of store hours for each day of the week."""
+        if not open_time or not close_time:
+            return {}
         return {
             day: {"open": open_time, "close": close_time}
             for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
