@@ -6,6 +6,7 @@ class XfinitySpider(scrapy.Spider):
     name = "xfinity"
     allowed_domains = ["www.xfinity.com"]
     start_urls = ["https://www.xfinity.com/local/"]
+    required_fields = ['address', 'location', 'url']
 
     ADDRESS_ELEM_XPATH = '//h1/address[@id="address"]'
 
@@ -43,6 +44,10 @@ class XfinitySpider(scrapy.Spider):
         for key, value in parsed_store.items():
             if value is None or (isinstance(value, (list, dict)) and not value):
                 self.logger.warning(f"Missing or empty data for {key}")
+
+        if not all(parsed_store.get(field) for field in self.required_fields):
+            self.logger.warning(f"Missing required fields for store {parsed_store.get('address', 'Unknown')}: {parsed_store}")
+            return
 
         yield parsed_store
 
@@ -89,6 +94,17 @@ class XfinitySpider(scrapy.Spider):
             self.logger.error(f"Error formatting address: {error}", exc_info=True)
             return ""
     
+    @staticmethod
+    def clean_text(text: str) -> str:
+        return text.strip() if text else ""
+
+
+    @staticmethod
+    def normalize_hours_text(hours_text: str) -> str:
+        """Normalize the hours text by removing non-alphanumeric characters and converting to lowercase."""
+        return re.sub(r'[^a-z0-9:]', '', hours_text.lower().replace('to', '').replace('thru', ''))
+
+
     def _get_hours(self, response) -> dict[str, dict[str, str]]:
         """Extract and parse store hours."""
         try:
