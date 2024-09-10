@@ -12,6 +12,7 @@ class DunkinDonutsSpider(scrapy.Spider):
     name = "dunkindonuts"
     allowed_domains = ["locations.dunkindonuts.com"]
     start_urls = ["http://locations.dunkindonuts.com/en"]
+    required_fields = ['address', 'location', 'url', 'raw']
 
     URLS_SCRIPT_TEXT_XPATH = '//script[contains(text(), "window.__INITIAL__DATA__")]/text()'
 
@@ -43,7 +44,7 @@ class DunkinDonutsSpider(scrapy.Spider):
             script_text = response.xpath(self.URLS_SCRIPT_TEXT_XPATH).re_first(r'window.__INITIAL__DATA__ = (.*)')
             if not script_text:
                 self.logger.error(f"Failed to extract script text from store page: {response.url}")
-                return {}
+                return 
             
             data = json.loads(script_text)['document']
 
@@ -60,6 +61,10 @@ class DunkinDonutsSpider(scrapy.Spider):
 
             self._log_missing_data(parsed_store)
 
+            if not all(parsed_store.get(field) for field in self.required_fields):
+                self.logger.warning(f"Missing required fields for store {parsed_store.get('number', 'Unknown')}: {parsed_store}")
+                return
+
             return parsed_store
         except json.JSONDecodeError:
             self.logger.error(f"Failed to parse JSON data from store page: {response.url}")
@@ -67,12 +72,18 @@ class DunkinDonutsSpider(scrapy.Spider):
             self.logger.error(f"Missing key in JSON data for store page: {response.url}, error: {e}")
         except Exception as e:
             self.logger.error(f"Unexpected error in parse_store method: {e}", exc_info=True)
-        return {}
+        return 
 
     def _get_hours(self, hours_dict: dict) -> dict:
         """Extract and format store hours."""
         formatted_hours = {}
+
+        days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
         for day, hours_info in hours_dict.items():
+            if day.lower() not in days:
+                self.logger.warning(f"Invalid day: {day}")
+                continue
             parsed_hours = self._parse_hours(hours_info)
             if parsed_hours:
                 formatted_hours[day] = parsed_hours
@@ -101,7 +112,7 @@ class DunkinDonutsSpider(scrapy.Spider):
                 }
             self.logger.warning(f"Missing open or close time: {hours_info}")
         except Exception as e:
-            self.logger.error(f"Error parsing hours info: {e}", exc_info=True)
+            self.logger.error(f"Error parsing hours info: {e}, {hours_info}", exc_info=True)
         return {}
     
     @staticmethod
@@ -178,4 +189,4 @@ class DunkinDonutsSpider(scrapy.Spider):
         """Log warnings for missing data in parsed store information."""
         for key, value in parsed_store.items():
             if key != 'raw' and not value:
-                self.logger.warning(f"Missing data for {key}")
+                self.logger.warning(f"Missing data for {key} in store: {parsed_store['number']}")
