@@ -1,60 +1,53 @@
 from datetime import datetime
 import json
-import logging
-from typing import Any, Union, Generator
+from typing import Any, Generator, Union
 
 import scrapy
 from scrapy.http import Response
 
+
 class RaleysSpider(scrapy.Spider):
+    """Spider for scraping store information from Raleys website."""
+
     name = "raleys"
     allowed_domains = ["www.raleys.com"]
+    api_url = 'https://www.raleys.com/api/store'
+    rows_per_page = 75
 
     def start_requests(self) -> Generator[scrapy.Request, None, None]:
-        """
-        Initiates the crawling process by sending the first request.
-
-        Yields:
-            scrapy.Request: The initial request to start crawling.
-        """
-        url = 'https://www.raleys.com/api/store'
+        """Initiate the crawling process by sending the first request."""
         data = self.get_payload(0)
         try:
             yield scrapy.Request(
                 method="POST",
-                url=url,
+                url=self.api_url,
                 body=json.dumps(data),
                 headers={'Content-Type': 'application/json'},
                 callback=self.parse
             )
         except Exception as e:
-            self.logger.error(f"Error in start_requests: {str(e)}")
+            self.logger.error(f"Error in start_requests: {e}", exc_info=True)
 
-    def parse(self, response: Response) -> Generator[Union[dict, scrapy.Request], None, None]:
-        """
-        Parses the response and yields store data. If there are more pages,
-        it sends a new request for the next page.
-
-        Args:
-            response (Response): The response object from the request.
-
-        Yields:
-            dict[str, Any]: Store data from the response.
-            scrapy.Request: Next page request if there are more pages.
-        """
+    def parse(self, response: Response) -> Generator[Union[dict[str, Any], scrapy.Request], None, None]:
+        """Parse the response and yield store data or next page request."""
         try:
             data = response.json()
-            stores = data['data']
+            stores = data.get('data', [])
+
+            if not stores:
+                self.logger.warning("No stores found in the response")
 
             for store in stores:
                 yield self.parse_store(store)
 
-            if data['offset'] <= data['total']:
-                url = 'https://www.raleys.com/api/store'
-                new_data = self.get_payload(data['offset'])
+            current_offset = data.get('offset', 0)
+            total_stores = data.get('total', 0)
+            if current_offset < total_stores:
+                new_offset = current_offset + self.rows_per_page
+                new_data = self.get_payload(new_offset)
                 yield scrapy.Request(
                     method="POST",
-                    url=url,
+                    url=self.api_url,
                     body=json.dumps(new_data),
                     headers={'Content-Type': 'application/json'},
                     callback=self.parse
@@ -62,28 +55,30 @@ class RaleysSpider(scrapy.Spider):
         except json.JSONDecodeError:
             self.logger.error(f"Failed to decode JSON from response: {response.text}")
         except KeyError as e:
-            self.logger.error(f"Missing key in response data: {str(e)}")
+            self.logger.error(f"Missing key in response data: {e}")
         except Exception as e:
-            self.logger.error(f"Unexpected error in parse method: {str(e)}")
-
+            self.logger.error(f"Unexpected error in parse method: {e}", exc_info=True)
 
     def parse_store(self, store: dict[str, Any]) -> dict[str, Any]:
-        parsed_store = {}
+        """Parse individual store data."""
+        parsed_store = {
+            'number': store.get('number'),
+            'name': store.get('name'),
+            'phone_number': store.get('phone'),
+            'address': self._get_address(store.get('address', {})),
+            'location': self._get_location(store.get('coordinates', {})),
+            'hours': self._get_hours(store),
+            'services': self._get_services(store),
+            'url': f'https://www.raleys.com/store/{store.get("number")}',
+            'raw': store
+        }
 
-        parsed_store['number'] = store.get('number')
-        parsed_store['name'] = store.get('name')
-        parsed_store['phone_number'] = store.get('phone')
-
-        parsed_store['address'] = self._get_address(store.get('address', {}))
-        parsed_store['location'] = self._get_location(store.get('coordinates', {}))
-        parsed_store['hours'] = self._get_hours(store)
-        parsed_store['services'] = self._get_services(store)
-
-        parsed_store['url'] = f'https://www.raleys.com/store/{store.get("number")}'
-        parsed_store['raw'] = store
+        for key, value in parsed_store.items():
+            if value in (None, "", [], {}):
+                self.logger.warning(f"Missing or empty {key} for store {store.get('name', 'Unknown')}")
 
         return parsed_store
-    
+
     def _get_services(self, raw_store_data: dict[str, Any]) -> list[str]:
         """Extract and parse store services."""
         try:
@@ -100,69 +95,60 @@ class RaleysSpider(scrapy.Spider):
     def _get_hours(self, raw_store_data: dict[str, Any]) -> dict[str, dict[str, str]]:
         """Extract and parse store hours."""
         try:
-            hours = raw_store_data.get("storeHours", "")
-            if not hours:
+            hours_str = raw_store_data.get("storeHours", "")
+            if not hours_str:
                 self.logger.warning(f"No hours found for store {raw_store_data.get('name', 'Unknown')}")
                 return {}
 
-            open_close_dict = self.parse_time_range(hours)
-
+            open_close_dict = self.parse_time_range(hours_str)
             days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-
             return {day: open_close_dict for day in days}
-
         except Exception as e:
             self.logger.error(f"Error getting store hours: {e}", exc_info=True)
             return {}
-    
+
     @staticmethod
     def parse_time_range(time_range_str: str) -> dict[str, str]:
-        # Constants for expected string parts
-        EXPECTED_FORMAT = "Between {open_time} and {close_time}"
-        TIME_FORMAT = "%I:%M:%S %p"
-        OUTPUT_FORMAT = "%I:%M %p"
+        """Parse time range string into a dictionary of open and close times."""
+        expected_format = "Between {open_time} and {close_time}"
+        time_format = "%I:%M:%S %p"
+        output_format = "%I:%M %p"
 
-        # Remove extra spaces and split the string
         parts = time_range_str.strip().split()
 
-        # Validate the basic structure of the input string
         if len(parts) != 6 or parts[0] != "Between" or parts[3] != "and":
-            raise ValueError(f"Invalid time range format. Expected: {EXPECTED_FORMAT}")
+            raise ValueError(f"Invalid time range format. Expected: {expected_format}")
 
-        # Extract open and close times
         open_time_str, close_time_str = " ".join(parts[1:3]), " ".join(parts[4:6])
 
-        # Parse and format times
         try:
-            open_time = datetime.strptime(open_time_str, TIME_FORMAT)
-            close_time = datetime.strptime(close_time_str, TIME_FORMAT)
+            open_time = datetime.strptime(open_time_str, time_format)
+            close_time = datetime.strptime(close_time_str, time_format)
         except ValueError as e:
             raise ValueError(f"Invalid time format: {e}")
 
-        # Format times for output, removing leading zeros from hours
-        formatted_open = open_time.strftime(OUTPUT_FORMAT).lstrip("0")
-        formatted_close = close_time.strftime(OUTPUT_FORMAT).lstrip("0")
+        formatted_open = open_time.strftime(output_format).lstrip("0")
+        formatted_close = close_time.strftime(output_format).lstrip("0")
 
         return {
             "open": formatted_open,
             "close": formatted_close
         }
 
-
     def _get_address(self, address_info: dict[str, Any]) -> str:
         """Get the formatted store address."""
         try:
             street = address_info.get("street", "")
-
             city = address_info.get("city", "")
             state = address_info.get("state", "")
             zipcode = address_info.get("zip", "")
 
             city_state_zip = f"{city}, {state} {zipcode}".strip()
-
             full_address = ", ".join(filter(None, [street, city_state_zip]))
+
             if not full_address:
                 self.logger.warning(f"Missing address for store with address info: {address_info}")
+
             return full_address
         except Exception as error:
             self.logger.error(f"Error formatting address: {error}", exc_info=True)
@@ -179,6 +165,7 @@ class RaleysSpider(scrapy.Spider):
                     "type": "Point",
                     "coordinates": [float(longitude), float(latitude)]
                 }
+
             self.logger.warning(f"Missing latitude or longitude for store with location info: {location_info}")
             return {}
         except ValueError as error:
@@ -189,18 +176,10 @@ class RaleysSpider(scrapy.Spider):
 
     @staticmethod
     def get_payload(offset: int) -> dict[str, Any]:
-        """
-        Generates the payload for the API request.
-
-        Args:
-            offset (int): The offset for pagination.
-
-        Returns:
-            dict[str, Any]: The payload dictionary for the API request.
-        """
+        """Generate the payload for the API request."""
         return {
             "offset": offset,
-            "rows": 75,
+            "rows": RaleysSpider.rows_per_page,
             "searchParameter": {
                 "shippingMethod": "pickup",
                 "searchString": "",
