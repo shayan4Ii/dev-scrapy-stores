@@ -37,21 +37,72 @@ class ElsupermarketsSpider(scrapy.Spider):
         :param store: Dictionary containing store information
         :return: Store dictionary with added parsed hours
         """
+        parsed_store = {}
+
+        parsed_store["name"] = store.get("title")
+        parsed_store["phone_number"] = store.get("phone")
+        parsed_store["address"] = store.get("address").replace(', ,', ',').strip()
+
+        parsed_store["hours"] = self._get_hours(store)
+        parsed_store["services"] = store.get("services", [])
+        parsed_store["location"] = self._get_location(store.get("location", {}))
+
+        parsed_store["url"] = store.get("url")
+        parsed_store["raw"] = store
+
+        return parsed_store
+
+    def _get_location(self, location_info: dict[str, Any]) -> dict[str, Any]:
+        """Extract and format location coordinates."""
+        try:
+            latitude = location_info.get('lat')
+            longitude = location_info.get('lng')
+
+            if latitude is not None and longitude is not None:
+                return {
+                    "type": "Point",
+                    "coordinates": [float(longitude), float(latitude)]
+                }
+            self.logger.warning(f"Missing latitude or longitude for store with location info: {location_info}")
+            return {}
+        except ValueError as error:
+            self.logger.warning(f"Invalid latitude or longitude values: {error}")
+        except Exception as error:
+            self.logger.error(f"Error extracting location: {error}", exc_info=True)
+        return {}
+
+
+    def _get_hours(self, store: dict) -> dict:
+        """
+        Parse the store hours from the store data
+
+        :param store: Dictionary containing store information
+        :return: Dictionary of store hours for each day of the week
+        """
         hours_range = store.get("hours", "")
+        open_time, close_time = self.get_open_close_times(hours_range)
+        return self.create_hours_dict(open_time, close_time)
+
+    def get_open_close_times(self, hours_range: str) -> tuple[str, str]:
+        """
+        Parse the open and close times from the hours range string
+
+        :param hours_range: Hours range string
+        :return: Tuple of open and close times
+        """
         if not hours_range:
-            self.logger.warning(f"No hours found for store: {store.get('id', 'Unknown')}")
-            return store
+            self.logger.warning(f"No hours found for store with hours: {hours_range}")
+            return
 
         hours_range = hours_range.lower()
         try:
-            open_time, close_time = hours_range.split(" - ")
+            open_time, close_time = hours_range.split("-")
+            open_time = open_time.strip()
+            close_time = close_time.strip()
         except ValueError:
-            self.logger.error(f"Invalid hours format for store: {store.get('id', 'Unknown')}")
-            return store
-
-        hours = self.create_hours_dict(open_time, close_time)
-        store["parsed_hours"] = hours
-        return store
+            self.logger.error(f"Invalid hours format for store with hours: {hours_range}")
+        
+        return open_time, close_time
 
     @staticmethod
     def create_hours_dict(open_time: str, close_time: str) -> dict[str, dict[str, str]]:
