@@ -5,18 +5,17 @@ from typing import Any, Generator
 import scrapy
 from scrapy.http import Request, Response
 
-
 class WinnDixieSpider(scrapy.Spider):
-    """Spider for scraping WinnDixie store locations."""
+    """Spider for scraping WinnDixie store locations with integrated duplicate removal."""
 
     name = "winndixie"
     allowed_domains = ["www.winndixie.com"]
 
-    custom_settings = {
-        'ITEM_PIPELINES': {
-            'scrapy_store_scrapers.pipelines.WinnDixieDuplicatesPipeline': 300,
-        },
-    }
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.seen_store_ids = set()
+        self.duplicate_count = 0
+        self.processed_count = 0
 
     def start_requests(self) -> Generator[Request, None, None]:
         """Generate initial requests for the spider."""
@@ -51,10 +50,28 @@ class WinnDixieSpider(scrapy.Spider):
             stores = response.json()
             # filtered_stores = self.filter_stores(stores)
             for store in stores:
-                yield self.parse_store(store)
+                parsed_store = self.parse_store(store)
+                if self.is_duplicate(parsed_store):
+                    self.duplicate_count += 1
+                    self.logger.info(f"Duplicate store found: {parsed_store['number']}")
+                else:
+                    self.processed_count += 1
+                    yield parsed_store
         except json.JSONDecodeError:
             self.logger.error(f"Failed to parse JSON from response: {response.url}")
 
+    def is_duplicate(self, store: dict[str, Any]) -> bool:
+        """Check if the store is a duplicate."""
+        store_id = store.get('number')
+        if not store_id:
+            self.logger.warning(f"Store without number encountered: {store}")
+            return False
+
+        if store_id in self.seen_store_ids:
+            return True
+        
+        self.seen_store_ids.add(store_id)
+        return False
 
     def parse_store(self, store_info: dict) -> dict[str, Any]:
         """Parse the store details from the response."""
@@ -291,3 +308,9 @@ class WinnDixieSpider(scrapy.Spider):
             "referer": "https://www.winndixie.com/locator",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
         }
+    
+    def closed(self, reason):
+        """Log statistics when the spider closes."""
+        self.logger.info(f"Processed items: {self.processed_count}")
+        self.logger.info(f"Duplicate items dropped: {self.duplicate_count}")
+        self.logger.info(f"Unique stores found: {len(self.seen_store_ids)}")
