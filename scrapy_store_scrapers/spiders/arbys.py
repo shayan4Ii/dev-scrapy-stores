@@ -51,7 +51,7 @@ class ArbysSpider(scrapy.Spider):
                 "address": self._get_address(store.get("contactDetails", {}).get("address", {})),
                 "location": self._get_location(store.get("details", {})),
                 "hours": self._get_hours(store.get("hoursByDay", {})),
-                "services": store.get("services"),
+                "services": self._get_services(store.get("services", [])),
                 "url": f"https://www.arbys.com/locations/{store.get('url', '')}",
                 "raw": store
             }
@@ -70,6 +70,15 @@ class ArbysSpider(scrapy.Spider):
         except Exception as e:
             self.logger.error(f"Error in parse_store method: {e}", exc_info=True)
             return None
+        
+
+    def _get_services(self, services: list) -> list:
+        """Extract and format store services."""
+        try:
+            return [service.replace("_", " ").title() for service in services]
+        except Exception as e:
+            self.logger.error(f"Error extracting services: {e}", exc_info=True)
+            return []
     
     def _get_address(self, address_info: dict) -> str:
         """Format the store address from store information."""
