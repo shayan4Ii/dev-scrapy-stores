@@ -1,31 +1,36 @@
-from datetime import datetime
 import json
 import re
+from datetime import datetime
+from typing import Dict, List, Optional, Iterator, Any
 from urllib.parse import unquote
 
 import scrapy
 
 
 class BestbuySpider(scrapy.Spider):
+    """Spider for scraping BestBuy store information."""
+
     name = "bestbuy"
     allowed_domains = ["stores.bestbuy.com"]
     start_urls = ["http://stores.bestbuy.com/"]
     required_fields = ['address', 'location', 'url', 'raw']
 
+    json_regex = re.compile(r'JSON\.parse\(decodeURIComponent\("(.*)"\)\)')
 
-    json_regex = re.compile('JSON.parse\(decodeURIComponent\("(.*)"\)\)')
+    def parse(self, response: scrapy.http.Response) -> Iterator[scrapy.Request]:
+        """Parse the main page and extract store URLs."""
+        try:
+            data = self.get_parsed_json(response)
+            store_urls = self.extract_store_urls(data['document']['dm_directoryChildren'])
+            for url in store_urls:
+                yield response.follow(url, self.parse_store)
+        except Exception as e:
+            self.logger.error(f"Error in parse method: {e}", exc_info=True)
 
-    def parse(self, response):
-        data = self.get_parsed_json(response)
-        store_urls = self.extract_store_urls(data['document']['dm_directoryChildren'])
-        for url in store_urls:
-            yield response.follow(url, self.parse_store)
-
-    def parse_store(self, response) -> dict:
+    def parse_store(self, response: scrapy.http.Response) -> Optional[Dict[str, Any]]:
         """Parse individual store page and extract store information."""
         try:
             data = self.get_parsed_json(response)
-            
             store = data['document']
 
             parsed_store = {
@@ -42,8 +47,8 @@ class BestbuySpider(scrapy.Spider):
             self._log_missing_data(parsed_store)
 
             if not all(parsed_store.get(field) for field in self.required_fields):
-                self.logger.warning(f"Missing required fields for store {parsed_store.get('number', 'Unknown')}: {parsed_store}")
-                return
+                self.logger.warning(f"Missing required fields for store {parsed_store.get('number', 'Unknown')}")
+                return None
 
             return parsed_store
         except json.JSONDecodeError:
@@ -52,12 +57,11 @@ class BestbuySpider(scrapy.Spider):
             self.logger.error(f"Missing key in JSON data for store page: {response.url}, error: {e}")
         except Exception as e:
             self.logger.error(f"Unexpected error in parse_store method: {e}", exc_info=True)
-        return 
+        return None
 
-    def _get_hours(self, hours_dict: dict) -> dict:
+    def _get_hours(self, hours_dict: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
         """Extract and format store hours."""
         formatted_hours = {}
-
         days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
         for day, hours_info in hours_dict.items():
@@ -69,7 +73,7 @@ class BestbuySpider(scrapy.Spider):
                 formatted_hours[day] = parsed_hours
         return formatted_hours
     
-    def _parse_hours(self, hours_info: dict) -> dict:
+    def _parse_hours(self, hours_info: Dict[str, Any]) -> Dict[str, str]:
         """Parse hours information for a single day."""
         try:
             open_intervals = hours_info.get('openIntervals', [])
@@ -106,7 +110,7 @@ class BestbuySpider(scrapy.Spider):
         except ValueError:
             return time_str
 
-    def _get_address(self, address_info: dict) -> str:
+    def _get_address(self, address_info: Dict[str, str]) -> str:
         """Format store address."""
         try:
             address_parts = [
@@ -129,7 +133,7 @@ class BestbuySpider(scrapy.Spider):
             self.logger.error(f"Error formatting address: {e}", exc_info=True)
             return ""
 
-    def _get_location(self, location_info: dict) -> dict:
+    def _get_location(self, location_info: Dict[str, float]) -> Dict[str, Any]:
         """Extract and format location coordinates."""
         try:
             latitude = location_info.get('latitude')
@@ -147,17 +151,22 @@ class BestbuySpider(scrapy.Spider):
             self.logger.error(f"Error extracting location: {e}", exc_info=True)
         return {}
     
-    def get_parsed_json(self, response):
-        quoted_json_text = self.json_regex.search(response.text).group(1)
-        json_text = unquote(quoted_json_text)
-        return json.loads(json_text)
+    def get_parsed_json(self, response: scrapy.http.Response) -> Dict[str, Any]:
+        """Extract and parse JSON data from the response."""
+        try:
+            quoted_json_text = self.json_regex.search(response.text).group(1)
+            json_text = unquote(quoted_json_text)
+            return json.loads(json_text)
+        except (AttributeError, json.JSONDecodeError) as e:
+            self.logger.error(f"Error parsing JSON from response: {e}", exc_info=True)
+            return {}
 
     @staticmethod
-    def extract_store_urls(data) -> list:
+    def extract_store_urls(data: Dict[str, Any]) -> List[str]:
         """Recursively extract store URLs from the data structure."""
         urls = []
         
-        def recursive_extract(item) -> None:
+        def recursive_extract(item: Any) -> None:
             if isinstance(item, dict):
                 if 'slug' in item and 'dm_directoryChildren' not in item:
                     urls.append(item['slug'])
@@ -170,7 +179,7 @@ class BestbuySpider(scrapy.Spider):
         recursive_extract(data)
         return list(dict.fromkeys(urls))
     
-    def _log_missing_data(self, parsed_store: dict) -> None:
+    def _log_missing_data(self, parsed_store: Dict[str, Any]) -> None:
         """Log warnings for missing data in parsed store information."""
         for key, value in parsed_store.items():
             if key != 'raw' and not value:
