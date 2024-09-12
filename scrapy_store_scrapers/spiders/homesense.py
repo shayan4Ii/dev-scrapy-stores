@@ -1,10 +1,14 @@
-from datetime import datetime
-import re
-import scrapy
 import json
-from typing import Dict, List, Optional, Iterator, Any
+import re
+from datetime import datetime
+from typing import Any, Optional, Generator
+
+import scrapy
+from scrapy.http import Response
 
 class HomesenseSpider(scrapy.Spider):
+    """Spider for scraping Homesense store information."""
+
     name = "homesense"
     allowed_domains = ["us.homesense.com"]
     start_urls = ["https://us.homesense.com/locator#"]
@@ -14,15 +18,20 @@ class HomesenseSpider(scrapy.Spider):
     STORE_URLS_XPATH = '//ul[@class="states-list"]/li//a[@class="store-details-link"]/@href'
     STORE_DATA_RE = re.compile(r"pageProps: (.*),")
 
-    def parse(self, response):
+    def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
+        """Parse the main page and yield requests for individual store pages."""
         for store_url in response.xpath(self.STORE_URLS_XPATH).getall():
             yield scrapy.Request(response.urljoin(store_url), callback=self.parse_store)
 
-    def parse_store(self, response: scrapy.http.Response) -> Optional[Dict[str, Any]]:
+    def parse_store(self, response: Response) -> Optional[dict[str, Any]]:
         """Parse individual store page and extract store information."""
         try:
-            store_json = self.STORE_DATA_RE.search(response.text).group(1)
-            store_data = json.loads(store_json)
+            store_json = self.STORE_DATA_RE.search(response.text)
+            if not store_json:
+                self.logger.error(f"Failed to find store data in page: {response.url}")
+                return None
+
+            store_data = json.loads(store_json.group(1))
             store = store_data['document']
 
             parsed_store = {
@@ -55,15 +64,12 @@ class HomesenseSpider(scrapy.Spider):
         """Extract and format store services."""
         try:
             services_raw = store.get('_site', {}).get('c_servicesLocation', {}).get('servicesLink', [])
-            services = [service.get('cTA', {}).get('label', '') for service in services_raw]
-            services = [service for service in services if service]
-            return services
+            return [service['cTA']['label'] for service in services_raw if service.get('cTA', {}).get('label')]
         except Exception as e:
             self.logger.error(f"Error extracting services: {e}", exc_info=True)
             return []
 
-
-    def _get_hours(self, hours_dict: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+    def _get_hours(self, hours_dict: dict) -> dict:
         """Extract and format store hours."""
         formatted_hours = {}
         days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
@@ -77,7 +83,7 @@ class HomesenseSpider(scrapy.Spider):
                 formatted_hours[day] = parsed_hours
         return formatted_hours
     
-    def _parse_hours(self, hours_info: Dict[str, Any]) -> Dict[str, str]:
+    def _parse_hours(self, hours_info: dict) -> dict:
         """Parse hours information for a single day."""
         try:
             open_intervals = hours_info.get('openIntervals', [])
@@ -114,7 +120,7 @@ class HomesenseSpider(scrapy.Spider):
         except ValueError:
             return time_str
 
-    def _get_address(self, address_info: Dict[str, str]) -> str:
+    def _get_address(self, address_info: dict) -> str:
         """Format store address."""
         try:
             address_parts = [
@@ -137,7 +143,7 @@ class HomesenseSpider(scrapy.Spider):
             self.logger.error(f"Error formatting address: {e}", exc_info=True)
             return ""
 
-    def _get_location(self, location_info: Dict[str, float]) -> Dict[str, Any]:
+    def _get_location(self, location_info: dict) -> dict:
         """Extract and format location coordinates."""
         try:
             latitude = location_info.get('latitude')
@@ -155,11 +161,8 @@ class HomesenseSpider(scrapy.Spider):
             self.logger.error(f"Error extracting location: {e}", exc_info=True)
         return {}
         
-    def _log_missing_data(self, parsed_store: Dict[str, Any]) -> None:
+    def _log_missing_data(self, parsed_store: dict) -> None:
         """Log warnings for missing data in parsed store information."""
         for key, value in parsed_store.items():
             if key != 'raw' and not value:
-                self.logger.warning(f"Missing data for {key} in store: {parsed_store['number']}")        
-
-
-        
+                self.logger.warning(f"Missing data for {key} in store: {parsed_store['number']}")
