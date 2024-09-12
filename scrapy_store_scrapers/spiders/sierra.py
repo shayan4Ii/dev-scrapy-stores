@@ -1,12 +1,16 @@
-from datetime import datetime
-from typing import Any, Generator, Union
-from urllib.parse import urljoin
-import js2py
 import re
+from datetime import datetime
+from typing import Any, Generator
+from urllib.parse import urljoin
+
+import js2py
 import scrapy
+from scrapy.http import Response
 
 
 class SierraSpider(scrapy.Spider):
+    """Spider for scraping Sierra store data."""
+
     name = "sierra"
     allowed_domains = ["www.sierra.com"]
     start_urls = ["https://www.sierra.com/lp2/retail-stores/"]
@@ -14,28 +18,46 @@ class SierraSpider(scrapy.Spider):
 
     STORES_JSON_RE = re.compile(r"sierraData.storeData = (.*])\s*</script>", re.DOTALL)
 
-    def parse(self, response):
-        stores_json = self.STORES_JSON_RE.search(response.text).group(1)
-        stores_data = js2py.eval_js(stores_json)
-        
-        for store in stores_data:
-            yield self.parse_store(store)
+    def parse(self, response: Response) -> Generator[dict, None, None]:
+        """Parse the main page and yield store data."""
+        try:
+            stores_json = self.STORES_JSON_RE.search(response.text)
+            if not stores_json:
+                self.logger.error("Failed to find store data in response")
+                return
 
-    def parse_store(self, store):
-        parsed_store = {}
+            stores_data = js2py.eval_js(stores_json.group(1))
+            
+            for store in stores_data:
+                yield self.parse_store(store)
+        except Exception as e:
+            self.logger.error(f"Error in parse method: {e}", exc_info=True)
 
-        parsed_store["name"] = store["name"]
-        parsed_store["phone_number"] = store["phone"]
-        
-        parsed_store["address"] = self._get_address(store)
-        parsed_store["hours"] = self._get_hours(store)
-        parsed_store["location"] = self._get_location(store)
-        
-        parsed_store["url"] = urljoin(self.BASE_URL, store["link"])
-        parsed_store["raw"] = store
+    def parse_store(self, store: dict) -> dict:
+        """Parse individual store data."""
+        try:
+            parsed_store = {
+                "name": store.get("name"),
+                "phone_number": store.get("phone"),
+                "address": self._get_address(store),
+                "hours": self._get_hours(store),
+                "location": self._get_location(store),
+                "url": urljoin(self.BASE_URL, store.get("link", "")),
+                "raw": store
+            }
 
-        return parsed_store
-        
+            # Discard items missing required fields
+            required_fields = ["address", "location", "url", "raw"]
+            if all(parsed_store.get(field) for field in required_fields):
+                return parsed_store
+            else:
+                missing_fields = [field for field in required_fields if not parsed_store.get(field)]
+                self.logger.warning(f"Discarding item due to missing required fields: {missing_fields}")
+                return None
+        except Exception as e:
+            self.logger.error(f"Error parsing store: {e}", exc_info=True)
+            return None
+
     @staticmethod
     def format_time(time_str: str) -> str:
         """Add a space before 'am' or 'pm' if not present."""
@@ -45,7 +67,6 @@ class SierraSpider(scrapy.Spider):
     def normalize_hours_text(hours_text: str) -> str:
         """Normalize the hours text by removing non-alphanumeric characters and converting to lowercase."""
         return re.sub(r'[^a-z0-9:]', '', hours_text.lower().replace('to', '').replace('thru', ''))
-
 
     def _get_hours(self, raw_store_data: dict) -> dict[str, dict[str, str]]:
         """Extract and parse store hours."""
@@ -85,7 +106,7 @@ class SierraSpider(scrapy.Spider):
                 day = list(DAY_MAPPING.keys())[i % 7]
                 full_day = DAY_MAPPING[day]
                 if result[full_day]['open'] and result[full_day]['close']:
-                    self.logger.debug(f"Day {full_day} already has hours({input_text=}), skipping range {start_day} to {end_day}")
+                    self.logger.debug(f"Day {full_day} already has hours ({input_text=}), skipping range {start_day} to {end_day}")
                     continue
                 result[full_day]['open'] = open_time
                 result[full_day]['close'] = close_time
@@ -95,7 +116,7 @@ class SierraSpider(scrapy.Spider):
         for day, open_time, close_time in single_days:
             full_day = DAY_MAPPING[day]
             if result[full_day]['open'] and result[full_day]['close']:
-                self.logger.debug(f"Day {full_day} already has hours({input_text=}), skipping individual day {day}")
+                self.logger.debug(f"Day {full_day} already has hours ({input_text=}), skipping individual day {day}")
                 continue
             result[full_day]['open'] = open_time
             result[full_day]['close'] = close_time
@@ -103,7 +124,7 @@ class SierraSpider(scrapy.Spider):
         # Log warning for any missing days
         for day, hours in result.items():
             if hours['open'] is None or hours['close'] is None:
-                self.logger.warning(f"Missing hours for {day}({input_text=})")
+                self.logger.warning(f"Missing hours for {day} ({input_text=})")
 
         return result
 
@@ -124,7 +145,7 @@ class SierraSpider(scrapy.Spider):
                 return [("sun", "sat", open_time, close_time)]
         
         time_only_match = re.match(time_only_re, input_string)
-        if re.match(time_only_re, input_string):
+        if time_only_match:
             open_time = f"{time_only_match.group(1)} {time_only_match.group(2)}"
             close_time = f"{time_only_match.group(3)} {time_only_match.group(4)}"
             return [("sun", "sat", open_time, close_time)]
@@ -132,15 +153,10 @@ class SierraSpider(scrapy.Spider):
         pattern = f"({days_re}{day_suffix_re})({days_re}{day_suffix_re}){optional_colon_re}?{time_re}{time_re}"
         matches = re.finditer(pattern, input_string, re.MULTILINE)
         
-        results = []
-        for match in matches:
-            start_day = match.group(1)[:3]
-            end_day = match.group(2)[:3]
-            open_time = f"{match.group(3)} {match.group(4)}"
-            close_time = f"{match.group(5)} {match.group(6)}"
-            results.append((start_day, end_day, open_time, close_time))
-        
-        return results
+        return [
+            (match.group(1)[:3], match.group(2)[:3], f"{match.group(3)} {match.group(4)}", f"{match.group(5)} {match.group(6)}")
+            for match in matches
+        ]
 
     def _extract_business_hours(self, input_string: str) -> list[tuple[str, str, str]]:
         """Extract individual business hours from input string."""
@@ -152,14 +168,10 @@ class SierraSpider(scrapy.Spider):
         pattern = f"({days_re}{day_suffix_re}){optional_colon_re}?{time_re}{time_re}"
         matches = re.finditer(pattern, input_string, re.MULTILINE)
         
-        results = []
-        for match in matches:
-            day = match.group(1)[:3]
-            open_time = f"{match.group(2)} {match.group(3)}"
-            close_time = f"{match.group(4)} {match.group(5)}"
-            results.append((day, open_time, close_time))
-        
-        return results
+        return [
+            (match.group(1)[:3], f"{match.group(2)} {match.group(3)}", f"{match.group(4)} {match.group(5)}")
+            for match in matches
+        ]
 
     def _get_address(self, address_info: dict) -> str:
         """Format store address."""
@@ -203,4 +215,3 @@ class SierraSpider(scrapy.Spider):
         except Exception as error:
             self.logger.error(f"Error extracting location: {error}", exc_info=True)
         return {}
-        
