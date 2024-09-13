@@ -63,6 +63,11 @@ class RossstoresSpider(scrapy.Spider):
             for day in days:
                 hours_text = raw_store_data.get(day, "")
                 if not hours_text:
+                    self.logger.warning(f"Missing hours for {day}: {raw_store_data}")
+                    hours[day] = {
+                        "open": None,
+                        "close": None
+                    }
                     continue
 
                 open, close = hours_text.split("-")
