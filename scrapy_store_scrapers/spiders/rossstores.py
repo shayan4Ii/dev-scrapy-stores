@@ -32,9 +32,7 @@ class RossstoresSpider(scrapy.Spider):
     def parse_stores(self, response):
         """Parse store information from the response."""
         stores = response.json()
-        import pyperclip
-        pyperclip.copy(response.text)
-        print(stores)
+
         for store in stores["response"]["collection"]:
             if store["clientkey"] in self.store_client_keys:
                 continue
