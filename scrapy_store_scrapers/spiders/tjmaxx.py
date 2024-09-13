@@ -27,7 +27,7 @@ class TjmaxxSpider(scrapy.Spider):
     def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
         """Parse the main page and follow links to individual store pages."""
         store_urls = response.xpath(self.STORE_URLS_XPATH).getall()
-        for store_url in store_urls[:5]:  # Limit to 5 stores for testing
+        for store_url in store_urls:
             yield response.follow(store_url, callback=self.parse_store)
 
     def parse_store(self, response: Response) -> dict:
