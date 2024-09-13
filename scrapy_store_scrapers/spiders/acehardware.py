@@ -14,6 +14,11 @@ class AcehardwareSpider(scrapy.Spider):
     allowed_domains = ["www.acehardware.com"]
     start_urls = ["https://www.acehardware.com/store-directory"]
 
+    # Set concurrency limit to avoid getting blocked
+    custom_settings = {
+        "CONCURRENT_REQUESTS": 8,
+    }
+
     STORE_URLS_XPATH = '//div[@id="store-directory-list"]/div/div/div/a/@href'
     STORE_JSON_XPATH = '//script[@id="data-mz-preload-store"]/text()'
 
@@ -22,49 +27,56 @@ class AcehardwareSpider(scrapy.Spider):
         store_urls = response.xpath(self.STORE_URLS_XPATH).getall()
 
         for url in store_urls:
-            yield response.follow(url, self.parse_store)
+            yield response.follow(url, self.parse_store, cb_kwargs={"url": url, "retries": 0})
 
-    def parse_store(self, response: Response) -> Generator[dict, None, None]:
+    def parse_store(self, response: Response, url, retries: int) -> Generator[dict, None, None]:
         """Parse individual store data and yield structured information."""
-        try:
-            store_json = response.xpath(self.STORE_JSON_XPATH).get()
-            store_data = self.parse_json(store_json)
+        if response.url == 'https://www.acehardware.com/store-directory':
+            self.logger.warning(f"Redirected to store directory page: {url}")
+            return
 
-            if not store_data:
-                self.logger.warning(f"Failed to parse JSON data for URL: {response.url}")
+        store_json = response.xpath(self.STORE_JSON_XPATH).get()
+
+        if not store_json:
+            if retries < 3:
+                self.logger.warning(f"No JSON data found for URL: {response.url}. Retrying... (Attempt {retries + 1}/3)")
+                yield scrapy.Request(url, callback=self.parse_store, cb_kwargs={"url": url, "retries": retries + 1}, dont_filter=True)
+                return
+            else:
+                self.logger.error(f"Failed to retrieve JSON data after 3 attempts for URL: {response.url}")
                 return
 
-            parsed_store = {
-                "number": store_data.get('StoreNumber'),
-                "name": store_data.get('StoreName'),
-                "phone_number": store_data.get("Phone"),
-                "address": self._get_address(store_data),
-                "location": self._get_location(store_data),
-                "hours": self._get_hours(store_data),
-                "services": self._get_services(store_data),
-                "url": response.url,
-                "raw": store_data
-            }
+        store_data = self.parse_json(store_json)
 
-            # Discard items missing required fields
-            required_fields = ["address", "location", "url", "raw"]
-            if all(parsed_store.get(field) for field in required_fields):
-                yield parsed_store
-            else:
-                self.logger.warning(f"Discarded item due to missing required fields: {parsed_store}")
+        if not store_data:
+            self.logger.warning(f"Failed to parse JSON data for URL: {response.url}, {response.request.url}")
+            return
 
-        except Exception as e:
-            self.logger.error(f"Error parsing store data: {e}", exc_info=True)
+        parsed_store = {
+            "number": store_data.get('StoreNumber'),
+            "name": store_data.get('StoreName'),
+            "phone_number": store_data.get("Phone"),
+            "address": self._get_address(store_data),
+            "location": self._get_location(store_data),
+            "hours": self._get_hours(store_data),
+            "services": self._get_services(store_data),
+            "url": response.url,
+            "raw": store_data
+        }
+
+        # Discard items missing required fields
+        required_fields = ["address", "location", "url", "raw"]
+        if all(parsed_store.get(field) for field in required_fields):
+            yield parsed_store
+        else:
+            self.logger.warning(f"Discarded item due to missing required fields: {parsed_store}")
+
+        # except Exception as e:
+        #     self.logger.error(f"Error parsing store data: {e}", exc_info=True)
 
     def parse_json(self, json_string: Optional[str]) -> Optional[dict]:
         """Parse JSON string and handle potential errors."""
-        if not json_string:
-            return None
-        try:
-            return json.loads(json_string)
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Error decoding JSON: {e}", exc_info=True)
-            return None
+        return json.loads(json_string)
 
     def _get_services(self, raw_store_data: dict) -> list[str]:
         """Extract and parse store services."""
