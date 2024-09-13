@@ -31,7 +31,7 @@ class MacysSpider(scrapy.Spider):
         """Extract URLs from the response using the given XPath."""
         urls = response.xpath(xpath).getall()
         if not urls:
-            self.logger.warning(f"No URLs found for XPath: {xpath}")
+            self.logger.debug(f"No URLs found for XPath: {xpath}")
         return urls
 
     def parse_store(self, response: Response) -> Generator[Dict[str, Any], None, None]:
@@ -79,7 +79,7 @@ class MacysSpider(scrapy.Spider):
         """Parse the store data into a structured format."""
         return {
             "number": store_data.get("fid"),
-            "name": store_data.get("location_name"),
+            "name": store_data.get("district"),
             "phone_number": store_data.get("local_phone"),
             "address": self._get_address(store_data),
             "location": self._get_location(store_data),
@@ -129,7 +129,7 @@ class MacysSpider(scrapy.Spider):
                     "coordinates": [float(longitude), float(latitude)]
                 }
 
-            self.logger.warning(f"Missing latitude or longitude for store: {store_info.get('location_name')}")
+            self.logger.warning(f"Missing latitude or longitude for store: {store_info}")
             return {}
         except ValueError as error:
             self.logger.warning(f"Invalid latitude or longitude values: {error}")
@@ -142,7 +142,7 @@ class MacysSpider(scrapy.Spider):
         try:
             hours_raw = raw_store_data.get("hours_sets:primary", {}).get("days", {})
             if not hours_raw:
-                self.logger.warning(f"No hours found for store {raw_store_data.get('location_name', 'Unknown')}")
+                self.logger.warning(f"No hours found for store {raw_store_data}")
                 return {}
 
             hours: Dict[str, Dict[str, Optional[str]]] = {}
