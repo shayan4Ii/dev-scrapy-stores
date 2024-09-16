@@ -1,20 +1,20 @@
-import json
-import re
 from datetime import datetime
-from typing import Any, Dict, Generator, Optional
+from typing import Any, Generator, Optional
 
 import scrapy
 from scrapy.http import Response
 
 
-class OreillyautoSpider(scrapy.Spider):
+class OreillyAutoSpider(scrapy.Spider):
+    """Spider for scraping O'Reilly Auto Parts store information."""
+
     name = "oreillyauto"
     allowed_domains = ["locations.oreillyauto.com"]
     start_urls = ["http://locations.oreillyauto.com/"]
 
-    location_urls_xpath = '//ul[@id="browse-content"]/li/div/a/@href'
-    store_urls_xpath = '//ul[@id="browse-content"]//a[contains(text(), "Store Details")]'
-
+    # XPath selectors
+    LOCATION_URLS_XPATH = '//ul[@id="browse-content"]/li/div/a/@href'
+    STORE_URLS_XPATH = '//ul[@id="browse-content"]//a[contains(text(), "Store Details")]'
     NAME_XPATH = '//span[@class="location-name"]/text()'
     STORE_NUMBER_XPATH = 'normalize-space(//span[@class="store-number"])'
     PHONE_XPATH = '//span[contains(@class, "phone")]/div/text()'
@@ -26,17 +26,13 @@ class OreillyautoSpider(scrapy.Spider):
     CLOSE_TIME_XPATH = './/span[@class="time-close"]/text()'
     SERVICES_XPATH = '//ul[contains(@class, "location-specialties")]/li/@data-specialty-name'
 
-    STORES_INFO_JSON_RE = re.compile(r'\$config.defaultListData = \'(.*)\';')
-
     def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
         """Parse the main page and follow links to location pages."""
-        location_urls = response.xpath(self.location_urls_xpath).getall()
+        location_urls = response.xpath(self.LOCATION_URLS_XPATH).getall()
+        store_urls = response.xpath(self.STORE_URLS_XPATH)
 
-        for location_url in location_urls:
+        for location_url in location_urls[:2]:
             yield response.follow(location_url, self.parse)
-            break
-
-        store_urls = response.xpath(self.store_urls_xpath)
 
         for store_url in store_urls:
             yield response.follow(store_url, self.parse_store)
@@ -44,41 +40,56 @@ class OreillyautoSpider(scrapy.Spider):
         if not store_urls and not location_urls:
             yield self.parse_store(response)
 
+    def parse_store(self, response: Response) -> dict[str, Any]:
+        """Parse individual store pages."""
+        try:
+            parsed_store = {
+                "number": self._extract_store_number(response),
+                "name": response.xpath(self.NAME_XPATH).get('').strip(),
+                "phone_number": response.xpath(self.PHONE_XPATH).get('').strip(),
+                "address": self._get_address(response),
+                "location": self._get_location(response),
+                "hours": self._get_hours(response),
+                "services": response.xpath(self.SERVICES_XPATH).getall(),
+                "url": response.url,
+            }
 
-    def parse_store(self, response: Response) -> Dict[str, Any]:
-        parsed_store = {}
+            if self._validate_parsed_store(parsed_store):
+                return parsed_store
+            else:
+                self.logger.warning(f"Discarded item due to missing required fields: {response.url}")
+        except Exception as e:
+            self.logger.error(f"Error parsing store {response.url}: {e}", exc_info=True)
 
-        parsed_store["number"] = response.xpath(self.STORE_NUMBER_XPATH).re_first(r'#\s(\d+)')
-        parsed_store["name"] = response.xpath(self.NAME_XPATH).get('').strip()
-        parsed_store["phone_number"] = response.xpath(self.PHONE_XPATH).get('').strip()
-        parsed_store["address"] = self._get_address(response)
-        parsed_store["location"] = self._get_location(response)
-        parsed_store["hours"] = self._get_hours(response)
-        parsed_store["services"] = response.xpath(self.SERVICES_XPATH).getall()
-        parsed_store["url"] = response.url
+        return None
 
-        return parsed_store        
-
-    def _validate_parsed_store(self, parsed_store: Dict[str, Any]) -> bool:
+    def _validate_parsed_store(self, parsed_store: dict[str, Any]) -> bool:
         """Validate the parsed store data."""
-        required_fields = ["address", "location", "url", "raw"]
+        required_fields = ["address", "location", "url"]
         return all(parsed_store.get(field) for field in required_fields)
 
-    def _get_address(self, response) -> str:
+    def _extract_store_number(self, response: Response) -> Optional[str]:
+        """Extract store number from the response."""
+        try:
+            return response.xpath(self.STORE_NUMBER_XPATH).re_first(r'#\s(\d+)')
+        except Exception as e:
+            self.logger.error(f"Error extracting store number: {e}", exc_info=True)
+            return None
+
+    def _get_address(self, response: Response) -> str:
         """Format store address."""
         try:
             address_parts = [adr.xpath('normalize-space(.)').get('') for adr in response.xpath(self.ADDRESS_PARTS_XPATH)]
             if not address_parts:
-                self.logger.warning(f"No address parts found for store")
+                self.logger.warning(f"No address parts found for store: {response.url}")
                 return ""
             
-            full_address = ", ".join(address_parts)
-            return full_address
+            return ", ".join(address_parts)
         except Exception as e:
             self.logger.error(f"Error formatting address: {e}", exc_info=True)
             return ""
 
-    def _get_location(self, response) -> Dict[str, Any]:
+    def _get_location(self, response: Response) -> dict[str, Any]:
         """Extract and format location coordinates."""
         try:
             latitude = response.xpath(self.LAT_LONG_SCRIPT_XPATH).re_first(r'"latitude": "([^"]+)"')
@@ -90,7 +101,7 @@ class OreillyautoSpider(scrapy.Spider):
                     "coordinates": [float(longitude), float(latitude)]
                 }
 
-            self.logger.warning(f"Missing latitude or longitude for store")
+            self.logger.warning(f"Missing latitude or longitude for store: {response.url}")
             return {}
         except ValueError as error:
             self.logger.warning(f"Invalid latitude or longitude values: {error}")
@@ -98,7 +109,7 @@ class OreillyautoSpider(scrapy.Spider):
             self.logger.error(f"Error extracting location: {error}", exc_info=True)
         return {}
 
-    def _get_hours(self, response: Response) -> Dict[str, str]:
+    def _get_hours(self, response: Response) -> dict[str, dict[str, str]]:
         """Extract and parse store hours."""
         try:
             hours = {}
@@ -114,14 +125,3 @@ class OreillyautoSpider(scrapy.Spider):
         except Exception as e:
             self.logger.error(f"Error getting store hours: {e}", exc_info=True)
             return {}
-
-    @staticmethod
-    def _convert_to_12h_format(time_str: str) -> str:
-        """Convert time to 12-hour format."""
-        if not time_str:
-            return time_str
-        try:
-            time_obj = datetime.strptime(time_str, '%H:%M').time()
-            return time_obj.strftime('%I:%M %p').lower().lstrip('0')
-        except ValueError:
-            return time_str
