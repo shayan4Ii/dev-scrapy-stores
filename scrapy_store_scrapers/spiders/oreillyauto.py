@@ -31,7 +31,7 @@ class OreillyAutoSpider(scrapy.Spider):
         location_urls = response.xpath(self.LOCATION_URLS_XPATH).getall()
         store_urls = response.xpath(self.STORE_URLS_XPATH)
 
-        for location_url in location_urls[:2]:
+        for location_url in location_urls:
             yield response.follow(location_url, self.parse)
 
         for store_url in store_urls:
