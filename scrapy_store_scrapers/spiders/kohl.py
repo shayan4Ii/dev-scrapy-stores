@@ -1,13 +1,15 @@
 import json
 import re
 from datetime import datetime
-from typing import Dict, List, Optional, Generator, Any
+from typing import Any, Dict, Generator, Optional
 
 import scrapy
 from scrapy.http import Response
 
 
 class KohlSpider(scrapy.Spider):
+    """Spider for scraping Kohl's store information."""
+
     name = "kohl"
     allowed_domains = ["kohls.com"]
     start_urls = ["https://www.kohls.com/stores.shtml"]
@@ -17,35 +19,46 @@ class KohlSpider(scrapy.Spider):
 
     STORES_INFO_JSON_RE = re.compile(r'\$config.defaultListData = \'(.*)\';')
 
-    def parse(self, response):
-        
+    def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
+        """Parse the main page and follow links to location pages."""
         location_urls = response.xpath(self.location_urls_xpath).getall()
 
         for location_url in location_urls:
             yield response.follow(location_url, self.parse)
-            break
 
         store_urls = response.xpath(self.store_urls_xpath)
 
         if store_urls:
             yield from self.parse_stores(response)
 
-    def parse_stores(self, response):
-
+    def parse_stores(self, response: Response) -> Generator[Dict[str, Any], None, None]:
+        """Parse store information from the response."""
         for store in self.get_stores(response):
-            yield self._parse_store_data(store)
+            parsed_store = self._parse_store_data(store)
+            if self._validate_parsed_store(parsed_store):
+                yield parsed_store
+            else:
+                self.logger.warning(f"Discarding incomplete store data: {parsed_store}")
 
-    def get_stores(self, response):        
-        store_info_json = self.STORES_INFO_JSON_RE.search(response.text).group(1)
-        unescaped_text = store_info_json.encode().decode('unicode_escape')
-        
-        stores_data = json.loads(unescaped_text)
+    def get_stores(self, response: Response) -> Generator[Dict[str, Any], None, None]:
+        """Extract store data from the response."""
+        try:
+            store_info_json = self.STORES_INFO_JSON_RE.search(response.text)
+            if not store_info_json:
+                self.logger.error("Failed to find store information JSON in the response")
+                return
 
-        for store in stores_data:
+            unescaped_text = store_info_json.group(1).encode().decode('unicode_escape')
+            stores_data = json.loads(unescaped_text)
 
-            store['hours_sets:primary'] = json.loads(store['hours_sets:primary'])
-            
-            yield store
+            for store in stores_data:
+                try:
+                    store['hours_sets:primary'] = json.loads(store['hours_sets:primary'])
+                    yield store
+                except json.JSONDecodeError:
+                    self.logger.warning(f"Failed to parse hours for store: {store.get('fid')}")
+        except Exception as e:
+            self.logger.error(f"Error extracting store data: {e}", exc_info=True)
 
     def _parse_store_data(self, store_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse the store data into a structured format."""
