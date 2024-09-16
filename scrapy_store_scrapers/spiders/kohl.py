@@ -64,7 +64,7 @@ class KohlSpider(scrapy.Spider):
         """Parse the store data into a structured format."""
         return {
             "number": store_data.get("fid"),
-            "name": store_data.get("address_1"),
+            "name": store_data.get("location_name"),
             "phone_number": store_data.get("local_phone"),
             "address": self._get_address(store_data),
             "location": self._get_location(store_data),
