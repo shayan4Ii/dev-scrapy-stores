@@ -14,8 +14,6 @@ class TractorSupplySpider(scrapy.Spider):
     # Custom settings to avoid getting banned
     custom_settings = {
         "CONCURRENT_REQUESTS": 1,
-        # "DOWNLOAD_DELAY": 1,
-        # "USER_AGENT": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
     }
 
     # XPath constants
