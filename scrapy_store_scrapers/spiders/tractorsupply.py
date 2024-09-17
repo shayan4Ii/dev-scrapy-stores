@@ -38,7 +38,8 @@ class TractorSupplySpider(scrapy.Spider):
         state_urls = response.xpath(self.STATE_URLS_XPATH).getall()
 
         for state_url in state_urls:
-            yield response.follow(state_url.lower(), callback=self.parse_state)
+            state_url = state_url.lower().replace("%20", "-")
+            yield response.follow(state_url, callback=self.parse_state)
 
     def parse_state(self, response: Response) -> Generator[scrapy.Request, None, None]:
         """Parse state pages and yield requests for individual store pages."""
