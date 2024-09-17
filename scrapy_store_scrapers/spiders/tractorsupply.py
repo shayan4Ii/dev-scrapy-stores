@@ -11,6 +11,12 @@ class TractorSupplySpider(scrapy.Spider):
     name = "tractorsupply"
     allowed_domains = ["www.tractorsupply.com"]
     start_urls = ["https://www.tractorsupply.com/tsc/store-locations"]
+    # Custom settings to avoid getting banned
+    custom_settings = {
+        "CONCURRENT_REQUESTS": 1,
+        # "DOWNLOAD_DELAY": 1,
+        # "USER_AGENT": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
+    }
 
     # XPath constants
     STATE_URLS_XPATH = '//ul[@class="store-list"]/li/a/@href'
