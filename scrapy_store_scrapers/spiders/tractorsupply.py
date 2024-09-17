@@ -57,11 +57,10 @@ class TractorSupplySpider(scrapy.Spider):
                 "hours": self._get_hours(response),
                 "services": self._get_services(response),
                 "url": response.url,
-                "raw": response.text,
             }
 
             # Discard items missing required fields
-            required_fields = ["address", "location", "url", "raw"]
+            required_fields = ["address", "location", "url"]
             if all(item.get(field) for field in required_fields):
                 return item
             else:
