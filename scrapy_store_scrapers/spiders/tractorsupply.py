@@ -1,59 +1,78 @@
-from typing import Generator
+import logging
+from typing import Generator, Optional
+
 import scrapy
+from scrapy.http import Response
 
 
-class TractorsupplySpider(scrapy.Spider):
+class TractorSupplySpider(scrapy.Spider):
+    """Spider for scraping TractorSupply store information."""
+
     name = "tractorsupply"
     allowed_domains = ["www.tractorsupply.com"]
     start_urls = ["https://www.tractorsupply.com/tsc/store-locations"]
 
+    # XPath constants
     STATE_URLS_XPATH = '//ul[@class="store-list"]/li/a/@href'
     STORE_LI_ELEMS_XPATH = '//ul[@class="store-list"]/li[@class="store-list-item"]'
     STORE_INPUT_XPATH_FORMAT = './input[@class="{}"]/@value'
-
     NAME_XPATH = '//div[@class="store-details"]/h1/text()'
     STORE_NUMBER_XPATH = '//div[@class="store-details"]/h1/span[@class="store-no"]/text()'
     PHONE_XPATH = '//span[@itemprop="Telephone"]/text()'
-
     ADDRESS_ELEM_XPATH = '//div[@class="store-address"]//address'
     STREET_XPATH = './span[@itemprop="streetAddress"]/text()'
     CITY_XPATH = './span[@itemprop="addressLocality"]/text()'
     STATE_XPATH = './span[@itemprop="addressRegion"]/text()'
     ZIP_XPATH = './span[@itemprop="postalCode"]/text()'
-
     SERVICES_ELEMS_XPATH = '//div[contains(@class, "store-services")]//div[@class="card-header"]/h2'
     PETVET_CLINIC_ELEM_XPATH = '//div[@id="pet-vet-clinic-info"]'
     STORE_DAYS_XPATH = '//div[@itemprop="openingHoursSpecification"]/div[contains(@class,"store-days")]/div/span/text()'
     STORE_TIMES_ELEM_XPATH = '//div[@itemprop="openingHoursSpecification"]/div[contains(@class,"store-time")]/div/span'
     OPEN_TIME_XPATH = './span[@itemprop="opens"]/text()'
     CLOSE_TIME_XPATH = './span[@itemprop="closes"]/text()'
-
     LATITUDE_XPATH = '//meta[@itemprop="latitude"]/@content'
     LONGITUDE_XPATH = '//meta[@itemprop="longitude"]/@content'
 
-    def parse(self, response):
+    def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
+        """Parse the main page and yield requests for state pages."""
         state_urls = response.xpath(self.STATE_URLS_XPATH).getall()
 
         for state_url in state_urls:
             yield response.follow(state_url.lower(), callback=self.parse_state)
 
-    def parse_state(self, response):
-        for store_url in list(self._get_store_urls(response)):
+    def parse_state(self, response: Response) -> Generator[scrapy.Request, None, None]:
+        """Parse state pages and yield requests for individual store pages."""
+        for store_url in self._get_store_urls(response):
             yield response.follow(store_url, callback=self.parse_store)
 
-    def parse_store(self, response):
-        return {
-            "name": self.clean_text(response.xpath(self.NAME_XPATH).get()),
-            "number": self.clean_text(response.xpath(self.STORE_NUMBER_XPATH).re_first('#(.*)')),
-            "phone_number": self.clean_text(response.xpath(self.PHONE_XPATH).get()),
-            "address": self._get_address(response),
-            "location": self._get_location(response),
-            "hours": self._get_hours(response),
-            "services": self._get_services(response),
-            "url": response.url
-        }
+    def parse_store(self, response: Response) -> Optional[dict]:
+        """Parse individual store pages and extract store information."""
+        try:
+            item = {
+                "name": self.clean_text(response.xpath(self.NAME_XPATH).get()),
+                "number": self.clean_text(response.xpath(self.STORE_NUMBER_XPATH).re_first(r'#(.*)')),
+                "phone_number": self.clean_text(response.xpath(self.PHONE_XPATH).get()),
+                "address": self._get_address(response),
+                "location": self._get_location(response),
+                "hours": self._get_hours(response),
+                "services": self._get_services(response),
+                "url": response.url,
+                "raw": response.text,
+            }
 
-    def _get_store_urls(self, response) -> Generator[str, None, None]:
+            # Discard items missing required fields
+            required_fields = ["address", "location", "url", "raw"]
+            if all(item.get(field) for field in required_fields):
+                return item
+            else:
+                self.logger.warning(f"Discarding item due to missing required fields: {response.url}")
+                return None
+
+        except Exception as e:
+            self.logger.error(f"Error parsing store {response.url}: {e}", exc_info=True)
+            return None
+
+    def _get_store_urls(self, response: Response) -> Generator[str, None, None]:
         """Extract store URLs from the response."""
         try:
             class_names = ["store-city", "store-state", "store-zipcode", "store-storeid"]
@@ -71,9 +90,8 @@ class TractorsupplySpider(scrapy.Spider):
                 yield store_url
         except Exception as e:
             self.logger.error(f"Error getting store URLs: {e}", exc_info=True)
-            return
 
-    def _get_location(self, response) -> dict:
+    def _get_location(self, response: Response) -> dict:
         """Extract and format location coordinates."""
         try:
             latitude = response.xpath(self.LATITUDE_XPATH).get()
@@ -84,7 +102,7 @@ class TractorsupplySpider(scrapy.Spider):
                     "type": "Point",
                     "coordinates": [float(longitude), float(latitude)]
                 }
-            self.logger.warning(f"Missing latitude or longitude for store")
+            self.logger.warning(f"Missing latitude or longitude for store: {response.url}")
             return {}
         except ValueError as e:
             self.logger.warning(f"Invalid latitude or longitude values: {e}")
@@ -92,16 +110,13 @@ class TractorsupplySpider(scrapy.Spider):
             self.logger.error(f"Error extracting location: {e}", exc_info=True)
         return {}
 
-    def _get_address(self, response) -> str:
+    def _get_address(self, response: Response) -> str:
         """Get the formatted store address."""
         try:
             address_elem = response.xpath(self.ADDRESS_ELEM_XPATH)
             street_address = self.clean_text(address_elem.xpath(self.STREET_XPATH).get())
-            # street_address_2 = self.clean_text(address_elem.xpath(self.STREET_ADDRESS_2_XPATH).get())
 
-            address_parts = [street_address]
-            street = ", ".join(filter(None, address_parts)).title()
-
+            street = street_address.title()
             city = self.clean_text(address_elem.xpath(self.CITY_XPATH).get()).title()
             state = self.clean_text(address_elem.xpath(self.STATE_XPATH).get())
             zipcode = self.clean_text(address_elem.xpath(self.ZIP_XPATH).get())
@@ -110,21 +125,23 @@ class TractorsupplySpider(scrapy.Spider):
 
             full_address = ", ".join(filter(None, [street, city_state_zip]))
             if not full_address:
-                self.logger.warning(f"Missing address for store")
+                self.logger.warning(f"Missing address for store: {response.url}")
             return full_address
         except Exception as error:
             self.logger.error(f"Error formatting address: {error}", exc_info=True)
             return ""
 
     @staticmethod
-    def clean_text(text: str) -> str:
+    def clean_text(text: Optional[str]) -> str:
+        """Clean and normalize text."""
         return text.strip() if text else ""
 
     @staticmethod
-    def normalize_spaces(text: str) -> str:
+    def normalize_spaces(text: Optional[str]) -> str:
+        """Normalize spaces in text."""
         return " ".join(text.split()) if text else ""
 
-    def _get_hours(self, response) -> dict[str, dict[str, str]]:
+    def _get_hours(self, response: Response) -> dict[str, dict[str, str]]:
         """Extract and parse store hours."""
         try:
             hours = {}
@@ -142,14 +159,14 @@ class TractorsupplySpider(scrapy.Spider):
                 }
             
             if not hours:
-                self.logger.warning(f"Missing store hours")
+                self.logger.warning(f"Missing store hours for: {response.url}")
             
             return hours
         except Exception as e:
             self.logger.error(f"Error getting store hours: {e}", exc_info=True)
             return {}
         
-    def _get_services(self, response) -> list[str]:
+    def _get_services(self, response: Response) -> list[str]:
         """Extract store services."""
         try:
             services_elems = response.xpath(self.SERVICES_ELEMS_XPATH)
@@ -162,4 +179,3 @@ class TractorsupplySpider(scrapy.Spider):
         except Exception as e:
             self.logger.error(f"Error getting store services: {e}", exc_info=True)
             return []
-
