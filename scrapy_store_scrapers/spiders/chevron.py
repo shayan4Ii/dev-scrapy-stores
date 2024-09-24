@@ -28,7 +28,7 @@ class ChevronSpider(scrapy.Spider):
             return
 
         zipcodes = self._load_zipcode_data()
-        for zipcode in zipcodes[:2]:
+        for zipcode in zipcodes:
             api_url = self.API_FORMAT_URL.format(
                 client_id=client_id,
                 latitude=zipcode["latitude"],
