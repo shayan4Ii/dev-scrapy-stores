@@ -15,6 +15,10 @@ class ChevronSpider(scrapy.Spider):
     
     CLIENT_ID_XPATH = '//div[@class="cwtFindAStation__section"]/@data-clientid'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.processed_store_ids = set()
+
     def parse(self, response):
 
         client_id = self._get_client_id(response)
@@ -44,17 +48,22 @@ class ChevronSpider(scrapy.Spider):
         stores = response.json()
 
         for store in stores["stations"]:
-            parsed_store = {}
+            store_id = store["id"]
+            if store_id not in self.processed_store_ids:
+                self.processed_store_ids.add(store_id)
+                parsed_store = {}
 
-            parsed_store["number"] = store["id"]
-            parsed_store["name"] = store["name"]
-            parsed_store["phone_number"] = store["phone"]
-            parsed_store["address"] = self._get_address(store)
-            parsed_store["location"] = self._get_location(store)
-            parsed_store["url"] = f"https://www.chevronwithtechron.com/en_us/home/gas-station-near-me.html"
-            parsed_store["raw"] = store
+                parsed_store["number"] = store_id
+                parsed_store["name"] = store["name"]
+                parsed_store["phone_number"] = store["phone"]
+                parsed_store["address"] = self._get_address(store)
+                parsed_store["location"] = self._get_location(store)
+                parsed_store["url"] = f"https://www.chevronwithtechron.com/en_us/home/gas-station-near-me.html"
+                parsed_store["raw"] = store
 
-            yield parsed_store
+                yield parsed_store
+            else:
+                self.logger.info(f"Skipping duplicate store with ID: {store_id}")
 
     def _get_address(self, store_info) -> str:
         """Format store address."""
