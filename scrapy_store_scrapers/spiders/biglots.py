@@ -72,6 +72,15 @@ class BiglotsSpider(scrapy.Spider):
 
     def _get_hours(self, response: Response) -> dict[str, dict[str, str]]:
         """Extract and parse store hours."""
+        day_fullname_map = {
+            "sun": "sunday",
+            "mon": "monday",
+            "tue": "tuesday",
+            "wed": "wednesday",
+            "thu": "thursday",
+            "fri": "friday",
+            "sat": "saturday",
+        }
         try:
             hours = {}
             store_hours_container = response.xpath(self.HOURS_CONTAINER_XPATH).get()
@@ -82,9 +91,10 @@ class BiglotsSpider(scrapy.Spider):
             hours_detail_rows = response.xpath(self.HOURS_ROWS_XPATH)
             for row in hours_detail_rows:
                 day = self.clean_text(row.xpath(self.HOURS_DAY_XPATH).get()).lower()
+                full_day_name = day_fullname_map[day[:3]]
                 open_time = self.clean_text(row.xpath(self.HOURS_OPEN_XPATH).get()).lower()
                 close_time = self.clean_text(row.xpath(self.HOURS_CLOSE_XPATH).get()).lower()
-                hours[day] = {"open": open_time, "close": close_time}
+                hours[full_day_name] = {"open": open_time, "close": close_time}
 
             if not hours:
                 self.logger.warning(f"Missing store hours for: {response.url}")
