@@ -36,7 +36,7 @@ class BiglotsSpider(scrapy.Spider):
             location_urls = response.xpath(self.LOCATION_URLS_XPATH).getall()
             store_urls = response.xpath(self.STORE_URLS_XPATH).getall()
 
-            for url in location_urls[:2]:
+            for url in location_urls:
                 yield response.follow(url, callback=self.parse)
 
             for url in store_urls:
