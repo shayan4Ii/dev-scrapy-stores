@@ -61,6 +61,7 @@ class ShellSpider(scrapy.Spider):
             store_data = json.loads(store_json)
 
             services_name_map = store_data["config"]["intlData"]["messages"]["amenities"]
+            fuel_name_map = store_data["config"]["intlData"]["messages"]["fuels"]
             raw_store_info = store_data["location"]
 
             parsed_store = {
@@ -70,7 +71,7 @@ class ShellSpider(scrapy.Spider):
                 "phone_number": raw_store_info["telephone"],
                 "location": self._get_location(raw_store_info),
                 "hours": self._get_hours(raw_store_info),
-                "services": self._get_services(raw_store_info, services_name_map),
+                "services": self._get_services(raw_store_info, services_name_map, fuel_name_map),
                 "url": response.url,
                 "raw": store_data
             }
@@ -138,14 +139,20 @@ class ShellSpider(scrapy.Spider):
             self.logger.error("Error extracting location: %s", error, exc_info=True)
         return None
 
-    def _get_services(self, store_info: dict, services_name_map: dict) -> List[str]:
+    def _get_services(self, store_info: dict, services_name_map: dict, fuel_name_map:dict) -> List[str]:
         """Extract and format services."""
         try:
             services = [services_name_map[service] for service in store_info["amenities"]]
-            # fuels
-            # ev_charging
-            # hydrogen
-            return 
+            fuels = [fuel_name_map[fuel] for fuel in store_info["fuels"]]
+            services.extend(fuels)
+
+            if store_info.get("ev_charging", {}).get("charging_points", 0) > 0:
+                services.append("Electric Vehicle Charging")
+            
+            if store_info.get("hydrogen_offering"):
+                services.append("Hydrogen Fueling")
+            
+            return services
         except Exception as e:
             self.logger.error("Error extracting services: %s", e, exc_info=True)
             return []
