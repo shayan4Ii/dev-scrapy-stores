@@ -196,7 +196,6 @@ class TotalWineScraper:
             for state_code in state_codes:
                 self.logger.info(f"Scraping stores for state: {state_code}")
                 yield from self.get_stores_by_state(state_code)
-                break
         except Exception as e:
             self.logger.error(f"Error during store scraping: {e}", exc_info=True)
 
