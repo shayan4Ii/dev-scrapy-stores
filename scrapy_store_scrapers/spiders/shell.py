@@ -141,7 +141,11 @@ class ShellSpider(scrapy.Spider):
     def _get_services(self, store_info: dict, services_name_map: dict) -> List[str]:
         """Extract and format services."""
         try:
-            return [services_name_map[service] for service in store_info["amenities"]]
+            services = [services_name_map[service] for service in store_info["amenities"]]
+            # fuels
+            # ev_charging
+            # hydrogen
+            return 
         except Exception as e:
             self.logger.error("Error extracting services: %s", e, exc_info=True)
             return []
@@ -151,6 +155,9 @@ class ShellSpider(scrapy.Spider):
         try:
             hours = {}
             hours_list = store_info.get("shop_opening_hours", {})
+
+            if not hours_list:
+                hours_list = store_info.get("forecourt_opening_hours", {})
 
             if not hours_list:
                 self.logger.warning("No hours found for store: %s", store_info.get("location_id"))
