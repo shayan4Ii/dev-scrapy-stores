@@ -2,6 +2,7 @@ import json
 import scrapy
 from datetime import datetime, timedelta
 
+
 class ZaxbysSpider(scrapy.Spider):
     name = "zaxbys"
     allowed_domains = ["zapi.zaxbys.com"]
@@ -66,45 +67,55 @@ class ZaxbysSpider(scrapy.Spider):
     def _parse_store_with_hours(self, response):
         store = response.meta['store']
         hours_data = response.json()
-        store_data = self._parse_store(store)
-        store_data['hours'] = hours_data
-        # store_data['hours'] = self._get_hours(hours_data)
+        store_data = self._parse_store(store, hours_data)
         yield store_data
 
-    def _parse_store(self, store):
+    def _parse_store(self, store, hours_data):
         """Parse individual store data."""
+        store['hours_data'] = hours_data
         return {
             "number": store.get("storeId"),
             "name": store.get("storeName"),
             "phone_number": store.get("phone"),
             "address": self._get_address(store),
             "location": self._get_location(store),
+            'hours': self._get_hours(hours_data),
             "url": self._get_url(store),
             "raw": store
         }
 
     def _get_hours(self, hours_data):
         """Parse store hours from the API response."""
-        parsed_hours = {}
-        days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        
+        parsed_hours = {
+            'monday': {'open': None, 'close': None},
+            'tuesday': {'open': None, 'close': None},
+            'wednesday': {'open': None, 'close': None},
+            'thursday': {'open': None, 'close': None},
+            'friday': {'open': None, 'close': None},
+            'saturday': {'open': None, 'close': None},
+            'sunday': {'open': None, 'close': None}
+        }
+
+        day_mapping = {
+            'Mon': 'monday', 'Tue': 'tuesday', 'Wed': 'wednesday',
+            'Thu': 'thursday', 'Fri': 'friday', 'Sat': 'saturday', 'Sun': 'sunday'
+        }
+
         for day_data in hours_data:
-            date = day_data.get('date')
-            day_of_week = datetime.strptime(date, '%Y-%m-%d').strftime('%A')
-            
-            open_time = day_data.get('open')
-            close_time = day_data.get('close')
-            
-            if open_time and close_time:
-                parsed_hours[day_of_week] = f"{open_time} - {close_time}"
-            else:
-                parsed_hours[day_of_week] = "Closed"
-        
-        # Ensure all days of the week are included, even if missing from the API response
-        for day in days_of_week:
-            if day not in parsed_hours:
-                parsed_hours[day] = "Hours not available"
-        
+            if day_data['type'] == 'business':
+                for range_data in day_data['ranges']:
+                    day_of_week = day_mapping[range_data['day']]
+
+                    open_time = datetime.strptime(range_data['opensAt'].split(
+                    )[1], '%H:%M').strftime('%I:%M %p').lower().lstrip('0')
+                    close_time = datetime.strptime(range_data['closeAt'].split()[
+                                                   1], '%H:%M').strftime('%I:%M %p').lower().lstrip('0')
+
+                    parsed_hours[day_of_week] = {
+                        "open": open_time,
+                        "close": close_time
+                    }
+
         return parsed_hours
 
     def _get_address(self, store_info: dict) -> str:
