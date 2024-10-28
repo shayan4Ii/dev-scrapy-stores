@@ -23,7 +23,7 @@ NEWSPIDER_MODULE = "scrapy_store_scrapers.spiders"
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-# CONCURRENT_REQUESTS = 1
+# CONCURRENT_REQUESTS = 16
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
@@ -85,10 +85,10 @@ FEEDS = {
 
 LOG_ENABLED = True
 LOG_FILE_APPEND = False
-LOG_LEVEL = 'INFO'  # You can change this to 'INFO', 'WARNING', 'ERROR' as needed
+LOG_LEVEL = 'DEBUG'  # You can change this to 'INFO', 'WARNING', 'ERROR' as needed
 LOG_FORMAT = '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
 LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
-LOG_FILE = 'logs/logs.log'
+# LOG_FILE = 'logs/logs.log'
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
 # EXTENSIONS = {
@@ -97,9 +97,7 @@ LOG_FILE = 'logs/logs.log'
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-# ITEM_PIPELINES = {
-#    "scrapy_store_scrapers.pipelines.ScrapyStoreScrapersPipeline": 300,
-# }
+
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
@@ -126,3 +124,17 @@ LOG_FILE = 'logs/logs.log'
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
+
+SPIDERMON_ENABLED = True
+EXTENSIONS = {
+    'spidermon.contrib.scrapy.extensions.Spidermon': 500,
+}
+SPIDERMON_VALIDATION_SCHEMAS = (
+    'schemas/store_item.json',
+)
+ITEM_PIPELINES = {
+   'spidermon.contrib.scrapy.pipelines.ItemValidationPipeline': 800,
+}
+SPIDERMON_VALIDATION_ADD_ERRORS_TO_ITEMS = False
+
+SPIDERMON_SPIDER_CLOSE_MONITORS = ["scrapy_store_scrapers.monitors.SpiderCloseMonitorSuite"]

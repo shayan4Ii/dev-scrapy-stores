@@ -1,0 +1,7 @@
+scrapy
+js2py
+phpserialize
+json5
+pydantic
+spidermon[monitoring]
+curl_cffi
