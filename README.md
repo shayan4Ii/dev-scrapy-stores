@@ -230,3 +230,4 @@ self.logger.debug(f"Duplicate store found: {store_id}")
 	-   Follow PEP 8 (imports, style, naming)
 	-   Add one-line docstrings
 	-   Reorder methods logically
+    
