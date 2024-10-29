@@ -102,13 +102,10 @@ class Allentate(scrapy.Spider):
         try:
             lat = float(str(store.get("Latitude", 0)))
             lon = float(str(store.get("Longitude", 0)))
-            if -90 <= lat <= 90 and -180 <= lon <= 180:
-                return {
-                    "type": "Point", 
-                    "coordinates": [lon, lat]
-                }
-            self.logger.warning("Invalid coordinates: lat=%s, lon=%s", lat, lon)
-            return {}
+            return {
+                "type": "Point",
+                "coordinates": [lon, lat]
+            }
         except (ValueError, TypeError) as e:
             self.logger.error("Error getting location: %s", e, exc_info=True)
             return {}
