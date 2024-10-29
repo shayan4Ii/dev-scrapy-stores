@@ -1,13 +1,18 @@
 import copy
 import math
 import re
+import scrapy
+from typing import Dict, Iterable
+from scrapy.http import Response, Request
+import requests
+import json
+from scrapy.exceptions import CloseSpider
+from scrapy_store_scrapers.utils import *
+from curl_cffi import requests
 
-from scrapy_store_scrapers.spiders.base import *
 
 
-
-
-class TgiFridays(BaseSpider):
+class TgiFridays(scrapy.Spider):
     name = "tgifridays"
     endpoint = "https://liveapi.yext.com/v2/accounts/me/answers/vertical/query"
     params = {
@@ -22,7 +27,7 @@ class TgiFridays(BaseSpider):
 
     def start_requests(self) -> Iterable[Request]:
         self.set_api_key()
-        zipcodes = self._load_zipcode_data()
+        zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
         for zipcode in zipcodes:
             payload = copy.copy(self.params)
             payload['location'] = f"{zipcode['latitude']},{zipcode['longitude']}"
@@ -38,7 +43,7 @@ class TgiFridays(BaseSpider):
 
     def set_api_key(self):
         try:
-            response = requests.get("https://locations.tgifridays.com/assets/static/global-77e8a5f9.js")
+            response = requests.get("https://locations.tgifridays.com/assets/static/global-77e8a5f9.js", impersonate="chrome")
         except Exception as e:
             self.logger.error("Error setting api-key: %s", e, exc_info=True)
             raise CloseSpider()
@@ -91,8 +96,7 @@ class TgiFridays(BaseSpider):
                 "url": data['website'],
                 "raw": data
             }
-            if self._is_valid_item(item):
-                yield item
+            yield item
 
 
     def _get_address(self, address_obj: Dict):
@@ -122,10 +126,13 @@ class TgiFridays(BaseSpider):
                     return {}
                 day_hours = hours_obj[day].get('openIntervals')[0]
                 new_item[day] = {
-                    "open": self._convert_to_12h_format(day_hours['start']),
-                    "close": self._convert_to_12h_format(day_hours['end'])
+                    "open": convert_to_12h_format(day_hours['start']),
+                    "close": convert_to_12h_format(day_hours['end'])
                 }
             return new_item
         except Exception as e:
             self.logger.error("Error getting hours: %s", e, exc_info=True)
             return {}
+
+
+    
