@@ -1,7 +1,6 @@
 import scrapy
 from typing import Dict, Iterable
 from scrapy.http import Response, Request
-import json
 from scrapy_store_scrapers.utils import *
 
 
@@ -25,6 +24,7 @@ class WaffleHouse(scrapy.Spider):
                 "location": self._get_location(store),
                 "phone_number": store.get("phoneNumbers", [""])[0],
                 "hours": self._get_hours(store),
+                "url": store.get("websiteURL"),
                 "services": store.get("services",[]),
                 "raw": store
             }
