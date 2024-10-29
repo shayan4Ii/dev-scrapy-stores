@@ -41,7 +41,7 @@ class TgiFridays(scrapy.Spider):
             )
 
 
-    def set_api_key(self):
+    def set_api_key(self) -> None:
         try:
             response = requests.get("https://locations.tgifridays.com/assets/static/global-77e8a5f9.js", impersonate="chrome")
         except Exception as e:
@@ -56,7 +56,7 @@ class TgiFridays(scrapy.Spider):
                 raise CloseSpider("API key not found!")
         
         
-    def parse(self, response: Response, **kwargs: Dict):
+    def parse(self, response: Response, **kwargs: Dict) -> Iterable[Union[Dict, Request]]:
         yield from self.parse_stores(response)
         obj = json.loads(response.text)
 
@@ -74,7 +74,7 @@ class TgiFridays(scrapy.Spider):
             )
 
 
-    def parse_stores(self, response: Response, **kwargs: Dict):
+    def parse_stores(self, response: Response, **kwargs: Dict) -> Iterable[Dict]:
         obj = json.loads(response.text)
         for store in obj['response']['results']:
             data = store['data']
@@ -99,7 +99,7 @@ class TgiFridays(scrapy.Spider):
             yield item
 
 
-    def _get_address(self, address_obj: Dict):
+    def _get_address(self, address_obj: Dict) -> str:
         try:
             address_parts = [
                 address_obj.get("line1", ""),
@@ -117,7 +117,7 @@ class TgiFridays(scrapy.Spider):
             return ""
         
 
-    def _get_hours(self, hours_obj: Dict):
+    def _get_hours(self, hours_obj: Dict) -> Dict:
         new_item = {}
         try:
             for day in hours_obj:

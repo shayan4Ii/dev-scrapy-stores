@@ -17,40 +17,42 @@ class WaffleHouse(scrapy.Spider):
 
     def parse(self, response: Response):
         obj = json.loads(response.xpath("//script[@id='__NEXT_DATA__']/text()").get())
-        for location in obj.get("props",{}).get("pageProps",{}).get("locations",[]):
+        for store in obj.get("props",{}).get("pageProps",{}).get("locations",[]):
             yield {
-                "number": location.get("storeCode"),
-                "name": location.get("businessName"),
-                "address": self._get_address(location),
-                "location": self._get_location(location),
-                "phone_number": location.get("phoneNumbers", [""])[0],
-                "hours": self._get_hours(location),
-                "services": location.get("services",[]),
-                "url": location.get("websiteURL"),
-                "raw": location
+                "number": store.get("storeCode"),
+                "name": store.get("businessName"),
+                "address": self._get_address(store),
+                "location": self._get_location(store),
+                "phone_number": store.get("phoneNumbers", [""])[0],
+                "hours": self._get_hours(store),
+                "services": store.get("services",[]),
+                "raw": store
             }
 
 
-    def _get_address(self, location: Dict) -> str:
+    def _get_address(self, store: Dict) -> str:
         try:
             address_parts = [
-                location.get('addressLines', [''])[0],
-                location.get('city', ''),
-                location.get('state', ''),
-                location.get('postalCode', '')
+                store.get("addressLines", [""])[0],
             ]
-            street = address_parts[0]
-            city_state_zip = f"{address_parts[1]}, {address_parts[2]} {address_parts[3]}".strip()
+            street = ", ".join(filter(None, address_parts))
+
+            city = store.get("city", "")
+            state = store.get("state", "")
+            zipcode = store.get("postalCode", "")
+
+            city_state_zip = f"{city}, {state} {zipcode}".strip()
+
             return ", ".join(filter(None, [street, city_state_zip]))
         except Exception as e:
             self.logger.error("Error getting address: %s", e, exc_info=True)
             return ""
 
     
-    def _get_location(self, location: Dict) -> Dict:
+    def _get_location(self, store: Dict) -> Dict:
         try:
-            lat = float(str(location.get("latitude", 0)))
-            lon = float(str(location.get("longitude", 0)))
+            lat = float(str(store.get("latitude", 0)))
+            lon = float(str(store.get("longitude", 0)))
             if -90 <= lat <= 90 and -180 <= lon <= 180:
                 return {
                     "type": "Point", 
@@ -63,11 +65,11 @@ class WaffleHouse(scrapy.Spider):
             return {}
         
     
-    def _get_hours(self, location: Dict) -> Dict:
+    def _get_hours(self, store: Dict) -> Dict:
         days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
         new_item = {}
         try:
-            hours = location.get("businessHours",[])
+            hours = store.get("businessHours",[])
             if hours:
                 hours = [hour for hour in hours if hour]
                 for day, hour in zip(days, hours):

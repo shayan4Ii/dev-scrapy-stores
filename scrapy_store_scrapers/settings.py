@@ -85,7 +85,7 @@ FEEDS = {
 
 LOG_ENABLED = True
 LOG_FILE_APPEND = False
-LOG_LEVEL = 'INFO'  # You can change this to 'INFO', 'WARNING', 'ERROR' as needed
+LOG_LEVEL = 'DEBUG'  # You can change this to 'INFO', 'WARNING', 'ERROR' as needed
 LOG_FORMAT = '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
 LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
 # LOG_FILE = 'logs/logs.log'
