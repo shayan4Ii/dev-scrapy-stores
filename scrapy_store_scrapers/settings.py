@@ -85,7 +85,7 @@ FEEDS = {
 
 LOG_ENABLED = True
 LOG_FILE_APPEND = False
-LOG_LEVEL = 'DEBUG'  # You can change this to 'INFO', 'WARNING', 'ERROR' as needed
+LOG_LEVEL = 'INFO'  # You can change this to 'INFO', 'WARNING', 'ERROR' as needed
 LOG_FORMAT = '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
 LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
 # LOG_FILE = 'logs/logs.log'
@@ -135,7 +135,7 @@ SPIDERMON_VALIDATION_SCHEMAS = (
 ITEM_PIPELINES = {
    'spidermon.contrib.scrapy.pipelines.ItemValidationPipeline': 800,
 }
-SPIDERMON_VALIDATION_ADD_ERRORS_TO_ITEMS = False
+SPIDERMON_VALIDATION_ADD_ERRORS_TO_ITEMS = True
 SPIDERMON_VALIDATION_DROP_ITEMS_WITH_ERRORS = True
 
 SPIDERMON_SPIDER_CLOSE_MONITORS = ["scrapy_store_scrapers.monitors.SpiderCloseMonitorSuite"]
