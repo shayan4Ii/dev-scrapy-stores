@@ -70,6 +70,10 @@ class PadgettAdvisors(scrapy.Spider):
         try:
             lat = float(str(store.get("lat", 0)))
             lon = float(str(store.get("lng", 0)))
+            
+            if not lat or not lon:
+                return {}
+
             return {
                 "type": "Point",
                 "coordinates": [lon, lat]

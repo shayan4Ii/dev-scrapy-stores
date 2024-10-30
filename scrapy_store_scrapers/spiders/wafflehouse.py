@@ -58,6 +58,8 @@ class WaffleHouse(scrapy.Spider):
         try:
             lat = float(str(store.get("latitude", 0)))
             lon = float(str(store.get("longitude", 0)))
+            if not lat or not lon:
+                return {}
             return {
                 "type": "Point",
                 "coordinates": [lon, lat]
