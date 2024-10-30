@@ -24,10 +24,16 @@ class WaffleHouse(scrapy.Spider):
                 "location": self._get_location(store),
                 "phone_number": store.get("phoneNumbers", [""])[0],
                 "hours": self._get_hours(store),
-                "url": store.get("websiteURL"),
+                "url": self.get_url(store),
                 "raw": store
             }
 
+    def get_url(self, store: Dict) -> str:
+        local_page_url = store.get("localPageUrl", "")
+        if local_page_url:
+            return f"https://locations.wafflehouse.com{local_page_url}"
+        
+        return ""
 
     def _get_address(self, store: Dict) -> str:
         try:
