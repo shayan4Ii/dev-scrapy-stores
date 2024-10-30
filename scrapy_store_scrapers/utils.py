@@ -9,7 +9,12 @@ def convert_to_12h_format(time_str: str) -> str:
     if not time_str:
         return ""
     try:
-        time_obj = datetime.strptime(time_str, '%H:%M').time()
+        time_str = time_str.lower().replace("am", "").replace("pm","").strip()
+        if ":" in time_str:
+            _format = '%H:%M'
+        else:
+            _format = '%H'
+        time_obj = datetime.strptime(time_str, _format).time()
         return time_obj.strftime('%I:%M %p').lower().lstrip('0')
     except ValueError:
         return None

@@ -60,7 +60,7 @@
         }
       },
       "phone_number": {
-        "type": "string"
+        "type": ["string", "null"]
       },
       "hours": {
         "type": "object",
