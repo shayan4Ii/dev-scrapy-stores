@@ -25,7 +25,6 @@ class WaffleHouse(scrapy.Spider):
                 "phone_number": store.get("phoneNumbers", [""])[0],
                 "hours": self._get_hours(store),
                 "url": store.get("websiteURL"),
-                "services": store.get("services",[]),
                 "raw": store
             }
 
