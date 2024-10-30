@@ -42,8 +42,7 @@ class PadgettAdvisors(scrapy.Spider):
                 "location": self._get_location(store),
                 "phone_number": store['phone'],
                 "hours": self._get_hours(store),
-                "services": [],
-                "url": store.get("website"),
+                "url": "https://www.padgettadvisors.com/locations/",
                 "raw": store
             }
 
