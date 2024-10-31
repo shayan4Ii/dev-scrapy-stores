@@ -17,7 +17,7 @@ class Atproperties(scrapy.Spider):
         yield scrapy.Request(url, callback=self.parse)
 
 
-    def parse(self, response: Response, **kwargs):
+    def parse(self, response: Response) -> Iterable[Dict]:
         offices = json.loads(response.xpath("//office-list").re_first('\[.*?\]\"').strip('"'))
         for office in offices:
             yield {

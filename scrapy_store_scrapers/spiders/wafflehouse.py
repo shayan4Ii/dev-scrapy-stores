@@ -14,7 +14,7 @@ class WaffleHouse(scrapy.Spider):
         yield scrapy.Request(url=url, callback=self.parse)
 
 
-    def parse(self, response: Response):
+    def parse(self, response: Response) -> Iterable[Dict]:
         obj = json.loads(response.xpath("//script[@id='__NEXT_DATA__']/text()").get())
         for store in obj.get("props",{}).get("pageProps",{}).get("locations",[]):
             yield {

@@ -16,7 +16,7 @@ class LongandFoster(scrapy.Spider):
         )
 
 
-    def parse(self, response: Response, **kwargs) -> Generator[Dict, None, None]:
+    def parse(self, response: Response, **kwargs) -> Iterable[Dict]:
         pages = response.xpath("//div[@id='Master_dlCity']//a/@href").getall()
         for page in pages:
             yield scrapy.Request(
@@ -25,7 +25,7 @@ class LongandFoster(scrapy.Spider):
             )
 
 
-    def parse_page(self, response: Response) -> Generator[Request, None, None]:
+    def parse_page(self, response: Response) -> Iterable[Request]:
         offices = response.xpath("//div[@id='Master_dlCity']//a/@href").getall()
         for url in offices:
             yield scrapy.Request(
@@ -34,7 +34,7 @@ class LongandFoster(scrapy.Spider):
             )
 
 
-    def parse_office(self, response: Response) -> Generator[Dict, None, None]:
+    def parse_office(self, response: Response) -> Iterable[Dict]:
         try:
             match = re.search(r"(?:stringify\()(.*?)(?:\);)", response.xpath("//script[contains(text(), 'officeJSONData')]/text()").get(), re.DOTALL)
             data = re.sub(r'\s+', " ", match.group(1)).replace("desc()",'"a"')

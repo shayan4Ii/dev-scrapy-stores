@@ -17,7 +17,7 @@ class Kumon(scrapy.Spider):
     center_processed = set()
 
 
-    def start_requests(self) -> Generator[Request, None, None]:
+    def start_requests(self) -> Iterable[Request]:
         zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
         for zipcode in zipcodes:
             json_data = {
@@ -38,7 +38,7 @@ class Kumon(scrapy.Spider):
             )
 
 
-    def parse(self, response: Response) -> Generator[Request, None, None]:
+    def parse(self, response: Response) -> Iterable[Request]:
         centers = json.loads(response.text)['d']
         for center in centers:
             center_id = center['CenterGUID']
