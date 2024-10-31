@@ -101,6 +101,10 @@ class Allentate(scrapy.Spider):
         try:
             lat = float(str(store.get("Latitude", 0)))
             lon = float(str(store.get("Longitude", 0)))
+
+            if not lat or not lon:
+                return {}
+
             return {
                 "type": "Point",
                 "coordinates": [lon, lat]
