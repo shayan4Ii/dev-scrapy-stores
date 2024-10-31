@@ -46,14 +46,11 @@ class LongandFoster(scrapy.Spider):
         office = json.loads(data)
         url = office['url']
         yield {
-            "number": f"",
             "name": office['name'],
             "address": self._get_address(office),
             "location": self._get_location(response),
             "phone_number": office["telephone"],
-            "hours": {},
             "url": 'https://' + url if not url.startswith(('http://', 'https://')) else url,
-            "services": [],
             "raw": office
         }
 
