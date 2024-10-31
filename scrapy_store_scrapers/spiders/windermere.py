@@ -1,5 +1,5 @@
 import scrapy
-from typing import Dict, Iterable, Any
+from typing import Dict, Iterable, Generator
 from scrapy.http import Response, Request
 from scrapy_store_scrapers.utils import *
 
@@ -21,22 +21,23 @@ class Windermere(scrapy.Spider):
         )
 
 
-    def parse(self, response: Response, **kwargs) -> Dict:
+    def parse(self, response: Response, **kwargs) -> Generator[Dict, None, None]:
         offices = json.loads(response.text)['data']['result_list']
         for office in offices:
-            url = office.get('url')
             yield {
                 "number": f"{office['uuid']}",
                 "name": office['name'],
                 "address": self._get_address(office),
                 "location": self._get_location(office),
                 "phone_number": office.get("phone"),
-                "hours": {},
-                "url": 'https://www.windermere.com/directory/' if not url else f"https://{url}",
-                "services": [],
+                "url": self._get_url(office),
                 "raw": office
             }
 
+    def _get_url(self, office: Dict) -> str:
+        url_slug = office.get('url_slug')
+        if url_slug:
+            return f"https://www.windermere.com/directory/offices/{url_slug}"
 
     def _get_address(self, office: Dict) -> str:
         try:
