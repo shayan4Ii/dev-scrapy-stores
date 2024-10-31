@@ -51,8 +51,7 @@ class HowardHanna(scrapy.Spider):
                 "name": store.get("OfficeName"),
                 "address": self._get_address(store),
                 "location": self._get_location(store),
-                "hours": {},
-                "url": f"https://www.howardhanna.com/Office/Detail/{self.slugify(store.get('OfficeName'))}/{store.get('MlsNumber')}",
+                "url": f"https://www.howardhanna.com/Office/Detail/{self.slugify(store.get('OfficeName'))}/{store_id}",
                 "raw": store
             }
             partial_items.append(partial_item)
@@ -111,6 +110,10 @@ class HowardHanna(scrapy.Spider):
         try:
             lat = float(str(store.get("Latitude", 0)))
             lon = float(str(store.get("Longitude", 0)))
+
+            if not lat or not lon:
+                return {}
+
             return {
                 "type": "Point",
                 "coordinates": [lon, lat]
