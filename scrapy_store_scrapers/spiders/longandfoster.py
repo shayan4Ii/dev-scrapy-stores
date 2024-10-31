@@ -32,16 +32,17 @@ class LongandFoster(scrapy.Spider):
         for url in offices:
             yield scrapy.Request(
                 url=url,
-                callback=self.parse_office
+                callback=self.parse_office,
+                cb_kwargs={"city_url": response.url}
             )
 
 
-    def parse_office(self, response: Response):
+    def parse_office(self, response: Response, city_url: str):
         try:
             match = re.search(r"(?:stringify\()(.*?)(?:\);)", response.xpath("//script[contains(text(), 'officeJSONData')]/text()").get(), re.DOTALL)
             data = re.sub(r'\s+', " ", match.group(1)).replace("desc()",'"a"')
         except TypeError:
-            self.logger.info("Office not found!")
+            self.logger.info("Office not found! {}, City: {}".format(response.url, city_url))
             return
         office = json.loads(data)
         url = office['url']
