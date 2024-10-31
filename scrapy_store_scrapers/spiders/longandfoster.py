@@ -1,7 +1,7 @@
 import re
 
 import scrapy
-from typing import Dict, Iterable, Any
+from typing import Dict, Generator, Iterable, Any
 from scrapy.http import Response, Request
 from scrapy_store_scrapers.utils import *
 
@@ -18,7 +18,7 @@ class LongandFoster(scrapy.Spider):
         )
 
 
-    def parse(self, response: Response, **kwargs) -> Dict:
+    def parse(self, response: Response, **kwargs) -> Generator[Request, None, None]:
         pages = response.xpath("//div[@id='Master_dlCity']//a/@href").getall()
         for page in pages:
             yield scrapy.Request(
