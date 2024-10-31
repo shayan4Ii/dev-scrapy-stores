@@ -1,8 +1,5 @@
-from typing import Iterable, Dict
-
 import scrapy
-from scrapy import Request
-from scrapy.http import Response, JsonRequest
+from scrapy.http import JsonRequest
 
 from scrapy_store_scrapers.utils import *
 
@@ -41,14 +38,14 @@ class Kumon(scrapy.Spider):
             )
 
 
-    def parse(self, response: Response, **kwargs):
+    def parse(self, response: Response) -> Iterable[Request]:
         centers = json.loads(response.text)['d']
         for center in centers:
             center_id = center['CenterGUID']
             if center_id in self.center_processed:
                 continue
             self.center_processed.add(center_id)
-            yield {
+            partial_item = {
                 "number": center_id,
                 "name": center['CenterName'],
                 "address": self._get_address(center),
@@ -58,10 +55,24 @@ class Kumon(scrapy.Spider):
                 },
                 "phone_number": center['Phone'],
                 "hours": {},
-                "services": [],
+                # "services": [],  # not available
                 "url": "https://www.kumon.com/" + center['EpageUrl'],
                 "raw": center
             }
+            yield scrapy.Request(
+                url=partial_item['url'],
+                callback=self.parse_center,
+                cb_kwargs={"partial_item": partial_item},
+                meta={"impersonate": "safari15_5"}
+            )
+
+
+    def parse_center(self, response: Response, partial_item: Dict) -> Dict:
+        partial_item.update({
+            "hours": self._get_hours(response)
+        })
+        item = partial_item
+        return item
 
 
     def _get_address(self, center: Dict) -> str:
@@ -83,3 +94,21 @@ class Kumon(scrapy.Spider):
         except Exception as e:
             self.logger.error("Error getting address: %s", e, exc_info=True)
             return ""
+    
+
+    def _get_hours(self, response: Response) -> Dict:
+        days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        get_day = lambda d: next((day for day in days if d.lower() in day), None)
+        new_item = {}
+        try:
+            for day in response.xpath("//div[@class='card-hour']//li"):
+                name = day.xpath("./span[@class='day']/text()").get().lower().strip(":")
+                open, close = day.xpath(".//span[@class='class-hr']/text()").get().split("-")
+                new_item[get_day(name)] = {
+                    "open": convert_to_12h_format(open),
+                    "close": convert_to_12h_format(close)
+                }
+            return new_item
+        except Exception as e:
+            self.logger.error("Error getting hours: %s", e, exc_info=True)
+            return {}

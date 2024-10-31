@@ -21,7 +21,7 @@ class Windermere(scrapy.Spider):
         )
 
 
-    def parse(self, response: Response, **kwargs) -> Generator[Dict, None, None]:
+    def parse(self, response: Response) -> Iterable[Dict]:
         offices = json.loads(response.text)['data']['result_list']
         for office in offices:
             yield {

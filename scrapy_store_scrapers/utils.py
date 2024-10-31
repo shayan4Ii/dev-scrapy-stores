@@ -1,6 +1,7 @@
 from datetime import datetime
-from typing import Union
+from typing import Dict, Iterable, Any, Generator, Union, List
 import json
+from scrapy.http import Response, Request
 
 
 

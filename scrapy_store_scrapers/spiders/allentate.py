@@ -1,9 +1,9 @@
 import re
 import scrapy
-from typing import Iterable, Dict, List
 import json
-from scrapy.http import Response, JsonRequest
+from scrapy.http import JsonRequest
 from copy import deepcopy
+from scrapy_store_scrapers.utils import *
 
 
 class Allentate(scrapy.Spider):
@@ -20,7 +20,7 @@ class Allentate(scrapy.Spider):
     store_processed = set()
 
 
-    def start_requests(self) -> Iterable[scrapy.Request]:
+    def start_requests(self) -> Iterable[Request]:
         url = "https://www.allentate.com/Office/MapOffices"
         yield scrapy.Request(
             url=url,
@@ -37,7 +37,7 @@ class Allentate(scrapy.Spider):
         return text
 
 
-    def parse(self, response: Response) -> Iterable[Dict]:
+    def parse(self, response: Response) -> Iterable[JsonRequest]:
         stores = json.loads(response.text).get("Properties", [])
         partial_items = []
         for store in stores:
@@ -77,7 +77,7 @@ class Allentate(scrapy.Spider):
         )
 
 
-    def parse_store(self, response: Response, partial_items: List[Dict]):
+    def parse_store(self, response: Response, partial_items: List[Dict]) -> Iterable[Dict]:
         for store in partial_items:
             store_id = store['number']
             phone = response.xpath(f"//tr//a[contains(@href, '{store_id}')]/ancestor::tr/preceding-sibling::tr//a/text()").get()

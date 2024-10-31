@@ -1,9 +1,9 @@
 import re
 import scrapy
-from typing import Iterable, Dict, List
 import json
-from scrapy.http import Response, JsonRequest
+from scrapy.http import JsonRequest
 from copy import deepcopy
+from scrapy_store_scrapers.utils import *
 
 
 class HowardHanna(scrapy.Spider):
@@ -20,7 +20,7 @@ class HowardHanna(scrapy.Spider):
     store_processed = set()
 
 
-    def start_requests(self) -> Iterable[scrapy.Request]:
+    def start_requests(self) -> Iterable[Request]:
         url = "https://www.howardhanna.com/Office/MapOffices"
         yield scrapy.Request(
             url=url,

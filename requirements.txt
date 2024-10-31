@@ -5,3 +5,5 @@ json5
 pydantic
 spidermon[monitoring]
 curl_cffi
+scrapy-impersonate
+scrapy-playwright
