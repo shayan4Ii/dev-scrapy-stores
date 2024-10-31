@@ -65,6 +65,10 @@ class Windermere(scrapy.Spider):
         try:
             lat = float(str(office['location'].get("latitude", 0)))
             lon = float(str(office['location'].get("longitude", 0)))
+
+            if not lat or not lon:
+                return {}
+            
             return {
                 "type": "Point",
                 "coordinates": [lon, lat]
