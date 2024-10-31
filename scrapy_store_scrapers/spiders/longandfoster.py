@@ -1,8 +1,6 @@
 import re
-
 import scrapy
-from typing import Dict, Iterable, Any
-from scrapy.http import Response, Request
+
 from scrapy_store_scrapers.utils import *
 
 
@@ -18,7 +16,7 @@ class LongandFoster(scrapy.Spider):
         )
 
 
-    def parse(self, response: Response, **kwargs) -> Dict:
+    def parse(self, response: Response, **kwargs) -> Generator[Dict, None, None]:
         pages = response.xpath("//div[@id='Master_dlCity']//a/@href").getall()
         for page in pages:
             yield scrapy.Request(
@@ -27,7 +25,7 @@ class LongandFoster(scrapy.Spider):
             )
 
 
-    def parse_page(self, response: Response):
+    def parse_page(self, response: Response) -> Generator[Request, None, None]:
         offices = response.xpath("//div[@id='Master_dlCity']//a/@href").getall()
         for url in offices:
             yield scrapy.Request(
@@ -36,7 +34,7 @@ class LongandFoster(scrapy.Spider):
             )
 
 
-    def parse_office(self, response: Response):
+    def parse_office(self, response: Response) -> Generator[Dict, None, None]:
         try:
             match = re.search(r"(?:stringify\()(.*?)(?:\);)", response.xpath("//script[contains(text(), 'officeJSONData')]/text()").get(), re.DOTALL)
             data = re.sub(r'\s+', " ", match.group(1)).replace("desc()",'"a"')
@@ -46,14 +44,14 @@ class LongandFoster(scrapy.Spider):
         office = json.loads(data)
         url = office['url']
         yield {
-            "number": f"",
+            "number": re.search(r'(?:OfficeInfoPage\.init\()(.*?)(?:\);)', response.xpath("//script[contains(text(), 'OfficeInfoPage')]/text()").get(), re.DOTALL).group(1).split(",")[0].strip().strip('"'),
             "name": office['name'],
             "address": self._get_address(office),
             "location": self._get_location(response),
             "phone_number": office["telephone"],
-            "hours": {},
+            # "hours": {},  not available
             "url": 'https://' + url if not url.startswith(('http://', 'https://')) else url,
-            "services": [],
+            # "services": [],  not available
             "raw": office
         }
 
@@ -79,10 +77,9 @@ class LongandFoster(scrapy.Spider):
 
     def _get_location(self, response: Response) -> Dict:
         try:
-            lat_match = re.search(r'(?:startingMidLat:\s)(.*?)(?:,)', response.text)
-            long_match = re.search(r'(?:startingMidLong:\s)(.*?)(?:,)', response.text)
-            lat = float(str(lat_match.group(1)))
-            lon = float(str(long_match.group(1)))
+            match = re.search(r'(?:OfficeInfoPage\.init\()(.*?)(?:\);)', response.xpath("//script[contains(text(), 'OfficeInfoPage')]/text()").get(), re.DOTALL)
+            lat = float(match.group(1).split(",")[1].strip().strip('"'))
+            lon = float(match.group(1).split(",")[2].strip().strip('"'))
             return {
                 "type": "Point",
                 "coordinates": [lon, lat]
