@@ -42,7 +42,6 @@ class Allentate(scrapy.Spider):
                 "name": store.get("OfficeName"),
                 "address": self._get_address(store),
                 "location": self._get_location(store),
-                "hours": {},
                 "url": f"https://www.allentate.com/Office/Detail/{store.get('OfficeName')}/{store.get('MlsNumber')}",
                 "raw": store
             }
