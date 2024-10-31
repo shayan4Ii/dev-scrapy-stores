@@ -1,3 +1,4 @@
+import re
 import scrapy
 from typing import Iterable, Dict, List
 import json
@@ -28,6 +29,13 @@ class Allentate(scrapy.Spider):
             body=json.dumps(self.payload)
         )
 
+    def slugify(self, text):
+        text = text.lower()
+        text = re.sub(r'[^a-z0-9]+', '-', text)
+        text = re.sub(r'-+', '-', text)
+        text = text.strip('-')
+        return text
+
 
     def parse(self, response: Response) -> Iterable[Dict]:
         stores = json.loads(response.text).get("Properties", [])
@@ -42,7 +50,7 @@ class Allentate(scrapy.Spider):
                 "name": store.get("OfficeName"),
                 "address": self._get_address(store),
                 "location": self._get_location(store),
-                "url": f"https://www.allentate.com/Office/Detail/{store.get('OfficeName')}/{store.get('MlsNumber')}",
+                "url": f"https://www.allentate.com/Office/Detail/{self.slugify(store.get('OfficeName'))}/{store.get('MlsNumber')}",
                 "raw": store
             }
             partial_items.append(partial_item)
