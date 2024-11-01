@@ -35,7 +35,7 @@ class LongandFoster(scrapy.Spider):
             )
 
 
-    def parse_office(self, response: Response) -> Iterable[Dict]:
+    def parse_office(self, response: Response, city_url: str) -> Iterable[Dict]:
         try:
             match = re.search(r"(?:stringify\()(.*?)(?:\);)", response.xpath("//script[contains(text(), 'officeJSONData')]/text()").get(), re.DOTALL)
             data = re.sub(r'\s+', " ", match.group(1)).replace("desc()",'"a"')
@@ -52,7 +52,7 @@ class LongandFoster(scrapy.Spider):
             "phone_number": office["telephone"],
             # "hours": {},  not available
             "url": 'https://' + url if not url.startswith(('http://', 'https://')) else url,
-            # "services": [],  not available
+            "services": list(set(re.findall(r'(?:tileName\:\s\")(.*?)(?:\")', "\n".join(response.xpath("//script[contains(text(), 'serviceTiles.push')]/text()").getall())))),
             "raw": office
         }
 
