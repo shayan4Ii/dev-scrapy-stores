@@ -31,7 +31,7 @@ class BobEvans(scrapy.Spider):
                 "location": self._get_location(kitchen),
                 "phone_number": kitchen.get("telephone"),
                 "hours": self._get_hours(kitchen),
-                "url": "https://www.bobevans.com/locations",
+                "url": f"https://www.bobevans.com/locations/{kitchen['name'].lower()}",
                 # "services": [], not available
                 "raw": kitchen
             }
