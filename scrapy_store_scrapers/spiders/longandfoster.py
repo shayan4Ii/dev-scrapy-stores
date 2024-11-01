@@ -16,7 +16,7 @@ class LongandFoster(scrapy.Spider):
         )
 
 
-    def parse(self, response: Response, **kwargs) -> Iterable[Dict]:
+    def parse(self, response: Response) -> Iterable[Dict]:
         pages = response.xpath("//div[@id='Master_dlCity']//a/@href").getall()
         for page in pages:
             yield scrapy.Request(
