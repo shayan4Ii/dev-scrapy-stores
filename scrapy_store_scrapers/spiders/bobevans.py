@@ -13,7 +13,7 @@ class BobEvans(scrapy.Spider):
     def start_requests(self) -> Iterable[Request]:
         zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
         for zipcode in zipcodes:
-            url = f"https://www.bobevans.com/api/location/search?query={zipcode}"
+            url = f"https://www.bobevans.com/api/location/search?query={zipcode['zipcode']}"
             yield scrapy.Request(url, callback=self.parse)
 
 
@@ -31,7 +31,7 @@ class BobEvans(scrapy.Spider):
                 "location": self._get_location(kitchen),
                 "phone_number": kitchen.get("telephone"),
                 "hours": self._get_hours(kitchen),
-                "url": response.url,
+                "url": "https://www.bobevans.com/locations",
                 # "services": [], not available
                 "raw": kitchen
             }

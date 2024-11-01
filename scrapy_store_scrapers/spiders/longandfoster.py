@@ -43,7 +43,6 @@ class LongandFoster(scrapy.Spider):
             self.logger.info("Office not found! {}, City: {}".format(response.url, city_url))
             return
         office = json.loads(data)
-        url = office['url']
         yield {
             "number": re.search(r'(?:OfficeInfoPage\.init\()(.*?)(?:\);)', response.xpath("//script[contains(text(), 'OfficeInfoPage')]/text()").get(), re.DOTALL).group(1).split(",")[0].strip().strip('"'),
             "name": office['name'],
@@ -51,7 +50,7 @@ class LongandFoster(scrapy.Spider):
             "location": self._get_location(response),
             "phone_number": office["telephone"],
             # "hours": {},  not available
-            "url": 'https://' + url if not url.startswith(('http://', 'https://')) else url,
+            "url": response.url,
             "services": list(set(re.findall(r'(?:tileName\:\s\")(.*?)(?:\")', "\n".join(response.xpath("//script[contains(text(), 'serviceTiles.push')]/text()").getall())))),
             "raw": office
         }

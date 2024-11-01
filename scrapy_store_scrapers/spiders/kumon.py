@@ -46,7 +46,7 @@ class Kumon(scrapy.Spider):
                 continue
             self.center_processed.add(center_id)
             partial_item = {
-                "number": center_id,
+                # "number": center_id,
                 "name": center['CenterName'],
                 "address": self._get_address(center),
                 "location": {
