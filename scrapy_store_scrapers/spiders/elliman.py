@@ -57,7 +57,7 @@ class Elliman(scrapy.Spider):
 
     def parse_office(self, response: Response) -> Iterable[Request]:
         yield {
-            "number": response.url.split("/")[-3].replace("-",""),
+            # "number": response.url.split("/")[-3].replace("-",""),
             "name": response.xpath("//div[@class='title']/text()").get(),
             "address": self._get_address(response),
             "location": self._get_location(response),
