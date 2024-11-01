@@ -35,7 +35,7 @@ class Longhornsteakhouse(scrapy.Spider):
                 "address": self._get_address(restaurant),
                 "location": self._get_location(restaurant),
                 "phone_number": next(iter(restaurant["contactDetail"]['phoneDetail']), [{}]).get("phoneNumber"),
-                "url": response.url,
+                "url": self._get_url(restaurant),
                 "services": self._get_services(restaurant),
                 "raw": restaurant
             }
@@ -111,7 +111,21 @@ class Longhornsteakhouse(scrapy.Spider):
             "curbSideTogoEnabled": "curbside",
             "onlineTogoEnabled": "online ordering",
         }
+        for amenity in restaurant.get('amenities', []):
+            title = amenity.get('title',"").lower()
+            if title:
+                services.append(title)
         for feature in restaurant['features']:
             if feature in services_mapping:
                 services.append(services_mapping[feature])
         return services
+    
+
+    def _get_url(self, restaurant: Dict) -> str:
+        base_url = "https://www.longhornsteakhouse.com/locations/"
+        state = restaurant['contactDetail']['address']['stateCode'].lower()
+        city = restaurant['contactDetail']['address']['city'].lower().replace(" ", "-")
+        name = restaurant['restaurantName'].lower().replace(" ", "-")
+        restaurant_number = restaurant['restaurantNumber']
+        url = re.sub(r'-+', "-", f"{base_url}{state}/{city}/{name}/{restaurant_number}")
+        return url
