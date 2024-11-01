@@ -43,7 +43,8 @@ class Elliman(scrapy.Spider):
                 ],
             })
 
-        if offices:
+        current_page = int(response.xpath("//span[@id='current-page' and @class='paging__item  is-active']/text()").get())
+        if self.page_count == current_page:
             self.page_count +=1
             url = f"https://www.elliman.com/offices/usa/{self.page_count}-pg"
             yield scrapy.Request(url, callback=self.parse, meta={
@@ -51,7 +52,6 @@ class Elliman(scrapy.Spider):
                 "playwright_page_methods": [
                     PageMethod("wait_for_selector", "//div[contains(@id, 'brokeritem')]", state="attached")
                 ],
-                "dont_redirect": True
             })
 
 
