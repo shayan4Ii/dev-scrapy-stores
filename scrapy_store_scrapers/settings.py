@@ -154,7 +154,4 @@ def should_abort_request(request):
 PLAYWRIGHT_ABORT_REQUEST = should_abort_request
 PLAYWRIGHT_BROWSER_TYPE = "firefox"
 PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = 30*1000
-PLAYWRIGHT_LAUNCH_OPTIONS = {
-    "headless": False,
-}
 PLAYWRIGHT_MAX_CONTEXTS = 1

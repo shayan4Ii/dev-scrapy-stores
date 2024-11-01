@@ -70,15 +70,16 @@ class Elliman(scrapy.Spider):
 
 
     def _get_address(self, response: Response) -> str:
+        get_code = lambda string: re.search("\|\d{5}\|", string).group().strip("|")
         try:
             address_parts = [
-                response.xpath("//span[@class='street-address']/text()").get(),
+                response.xpath("//span[@class='street-address']/text()").get('').strip(),
             ]
             street = ", ".join(filter(None, address_parts))
 
-            city = response.xpath("//h2/text()").get('').split(",")[0]
-            state = response.xpath("//h2/text()").get('').split(",")[1]
-            zipcode = re.search(r'(?:brokerdetails_XSLParams\)\;rd\=\")(.*?)(?:\|\|\|)', response.text).group(1).split("|")[-1]
+            city = response.xpath("//h2/text()").get('').split(",")[0].strip()
+            state = response.xpath("//h2/text()").get('').split(",")[1].strip()
+            zipcode = get_code(re.search(r'(?:brokerdetails_XSLParams\)\;rd\=\")(.*?)(?:")', response.text).group(1))
 
             city_state_zip = f"{city}, {state} {zipcode}".strip()
 
