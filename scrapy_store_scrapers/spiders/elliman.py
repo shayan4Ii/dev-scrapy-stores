@@ -61,7 +61,7 @@ class Elliman(scrapy.Spider):
             "name": response.xpath("//div[@class='title']/text()").get(),
             "address": self._get_address(response),
             "location": self._get_location(response),
-            "phone_number": response.xpath("//a[contains(@href, 'tel')]/text()").get('').lower(),
+            "phone_number": response.xpath("//a[contains(@href, 'tel')]/text()").get('').lower().strip(),
             # "hours": None, # not available
             "url": response.url,
             # "services": [], not available
