@@ -101,7 +101,7 @@ class Kumon(scrapy.Spider):
         get_day = lambda d: next((day for day in days if d.lower() in day), None)
         new_item = {}
         try:
-            for day in response.xpath("//div[@class='card-hour']//li"):
+            for day in response.xpath("//input[@id='hour3']/following-sibling::div//li"):
                 name = day.xpath("./span[@class='day']/text()").get().lower().strip(":")
                 open, close = day.xpath(".//span[@class='class-hr']/text()").get().split("-")
                 new_item[get_day(name)] = {
