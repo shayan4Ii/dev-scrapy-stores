@@ -71,9 +71,19 @@
           "wednesday": {"$ref": "#/$defs/daySchedule"},
           "thursday": {"$ref": "#/$defs/daySchedule"},
           "friday": {"$ref": "#/$defs/daySchedule"},
-          "saturday": {"$ref": "#/$defs/daySchedule"},
-          "sunday": {"$ref": "#/$defs/daySchedule"}
-        }
+          "saturday": {
+            "oneOf": [
+                  {"$ref": "#/$defs/daySchedule"},
+                  {"type": "null"}
+              ]
+            },
+          "sunday": {
+              "oneOf": [
+                  {"$ref": "#/$defs/daySchedule"},
+                  {"type": "null"}
+              ]
+            }
+          }
       },
       "services": {
         "type": "array"
