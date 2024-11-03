@@ -59,7 +59,7 @@ class LongandFoster(scrapy.Spider):
     def _get_address(self, office: Dict) -> str:
         try:
             address_parts = [
-                office['address']['streetAddress'],
+                office['address']['streetAddress'].strip(),
             ]
             street = ", ".join(filter(None, address_parts))
 
