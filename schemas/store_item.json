@@ -123,7 +123,6 @@
     },
     "required": [
       "address",
-      "location",
-      "url"
+      "location"
     ]
   }
