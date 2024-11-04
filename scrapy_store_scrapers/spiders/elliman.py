@@ -8,7 +8,6 @@ from twisted.python.failure import Failure
 
 class Elliman(scrapy.Spider):
     name = "elliman"
-    kitchen_processed = set()
     page_count = 1
     custom_settings = dict(
         DOWNLOAD_HANDLERS = {

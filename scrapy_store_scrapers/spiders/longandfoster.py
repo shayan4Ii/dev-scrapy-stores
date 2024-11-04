@@ -49,7 +49,6 @@ class LongandFoster(scrapy.Spider):
             "address": self._get_address(office),
             "location": self._get_location(response),
             "phone_number": office["telephone"],
-            # "hours": {},  not available
             "url": response.url,
             "services": list(set(re.findall(r'(?:tileName\:\s\")(.*?)(?:\")', "\n".join(response.xpath("//script[contains(text(), 'serviceTiles.push')]/text()").getall())))),
             "raw": office

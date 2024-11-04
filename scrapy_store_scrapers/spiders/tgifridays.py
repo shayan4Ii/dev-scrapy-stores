@@ -22,7 +22,6 @@ class TgiFridays(scrapy.Spider):
         'verticalKey': 'locations',
         'limit': '50',
     }
-    store_processed = set()
 
 
     def start_requests(self) -> Iterable[Request]:
@@ -79,9 +78,6 @@ class TgiFridays(scrapy.Spider):
         for store in obj['response']['results']:
             data = store['data']
             store_id = str(data['id'])
-            if store_id in self.store_processed:
-                continue
-            self.store_processed.add(store_id)
             item = {
                 "number": store_id,
                 "name": data['name'],

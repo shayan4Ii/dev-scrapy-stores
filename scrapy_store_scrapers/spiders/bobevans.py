@@ -7,7 +7,6 @@ from scrapy_store_scrapers.utils import *
 
 class BobEvans(scrapy.Spider):
     name = "bobevans"
-    kitchen_processed = set()
 
 
     def start_requests(self) -> Iterable[Request]:
@@ -21,9 +20,6 @@ class BobEvans(scrapy.Spider):
         kitchens = json.loads(response.text)
         for kitchen in kitchens:
             kitchen_id = f"{kitchen['id']}"
-            if kitchen_id in self.kitchen_processed:
-                continue
-            self.kitchen_processed.add(kitchen_id)
             yield {
                 "number": kitchen_id,
                 "name": kitchen['name'],
@@ -32,7 +28,6 @@ class BobEvans(scrapy.Spider):
                 "phone_number": kitchen.get("telephone"),
                 "hours": self._get_hours(kitchen),
                 "url": f"https://www.bobevans.com/locations/{kitchen['name'].lower()}",
-                # "services": [], not available
                 "raw": kitchen
             }
 

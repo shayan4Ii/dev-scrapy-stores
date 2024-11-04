@@ -133,7 +133,8 @@ SPIDERMON_VALIDATION_SCHEMAS = (
     'schemas/store_item.json',
 )
 ITEM_PIPELINES = {
-   'spidermon.contrib.scrapy.pipelines.ItemValidationPipeline': 800,
+   'scrapy_store_scrapers.pipelines.DuplicateItemPipeline': 100,  
+   'spidermon.contrib.scrapy.pipelines.ItemValidationPipeline': 800, 
 }
 SPIDERMON_VALIDATION_ADD_ERRORS_TO_ITEMS = True
 SPIDERMON_VALIDATION_DROP_ITEMS_WITH_ERRORS = True

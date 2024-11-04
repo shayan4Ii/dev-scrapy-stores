@@ -37,7 +37,6 @@ class SweetGreen(scrapy.Spider):
                 "phone_number": location.get("phone"),
                 "hours": self._get_hours(location),
                 "url": f"https://order.sweetgreen.com/{location['slug']}/menu",
-                # "services": [], not available
                 "raw": location
             }
 

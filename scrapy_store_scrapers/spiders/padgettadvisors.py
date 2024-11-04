@@ -9,7 +9,6 @@ from scrapy_store_scrapers.utils import *
 
 class PadgettAdvisors(scrapy.Spider):
     name = "padgettadvisors"
-    store_processed = set()
 
 
     def start_requests(self) -> Iterable[Request]:
@@ -31,10 +30,6 @@ class PadgettAdvisors(scrapy.Spider):
     def parse(self, response: Response, **kwargs) -> Iterable[Dict]:
         stores = json.loads(response.text)
         for store in stores:
-            store_id = store['id']
-            if store_id in self.store_processed:
-                continue
-            self.store_processed.add(store_id)
             yield {
                 "number": store['id'],
                 "name": store['title'],

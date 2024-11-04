@@ -14,7 +14,6 @@ class Kumon(scrapy.Spider):
         },
         USER_AGENT = None
     )
-    center_processed = set()
 
 
     def start_requests(self) -> Iterable[Request]:
@@ -41,12 +40,7 @@ class Kumon(scrapy.Spider):
     def parse(self, response: Response) -> Iterable[Request]:
         centers = json.loads(response.text)['d']
         for center in centers:
-            center_id = center['CenterGUID']
-            if center_id in self.center_processed:
-                continue
-            self.center_processed.add(center_id)
             partial_item = {
-                # "number": center_id,
                 "name": center['CenterName'],
                 "address": self._get_address(center),
                 "location": {
@@ -55,7 +49,6 @@ class Kumon(scrapy.Spider):
                 },
                 "phone_number": center['Phone'],
                 "hours": {},
-                # "services": [],  # not available
                 "url": "https://www.kumon.com/" + center['EpageUrl'],
                 "raw": center
             }

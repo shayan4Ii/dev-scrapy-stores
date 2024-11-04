@@ -17,7 +17,6 @@ class Allentate(scrapy.Spider):
         'Radius': '100',
         'OrderBy': 'Closest',
     }
-    store_processed = set()
 
 
     def start_requests(self) -> Iterable[Request]:
@@ -42,9 +41,6 @@ class Allentate(scrapy.Spider):
         partial_items = []
         for store in stores:
             store_id = store.get("MlsNumber")
-            if store_id in self.store_processed:
-                continue
-            self.store_processed.add(store_id)
             partial_item = {
                 "number": store_id,
                 "name": store.get("OfficeName"),
