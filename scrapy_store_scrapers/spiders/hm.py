@@ -42,8 +42,6 @@ class Hm(scrapy.Spider):
             city = store.get("city", "")
             state = store['address'].get("state", "")
             zipcode = store['address'].get("postCode", "")
-            if "-" in zipcode:
-                zipcode = zipcode.split("-")[0]
 
             city_state_zip = f"{city}, {state} {zipcode}".strip()
 

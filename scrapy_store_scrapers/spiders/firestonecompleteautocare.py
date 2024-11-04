@@ -47,8 +47,6 @@ class FirestoneCompleteAutoCare(scrapy.Spider):
             city = store.get("city", "")
             state = store.get("state", "")
             zipcode = store.get("zip", "")
-            if "-" in zipcode:
-                zipcode = zipcode.split("-")[0]
 
             city_state_zip = f"{city}, {state} {zipcode}".strip()
 
@@ -56,7 +54,6 @@ class FirestoneCompleteAutoCare(scrapy.Spider):
         except Exception as e:
             self.logger.error("Error getting address: %s", e, exc_info=True)
             return ""
-
 
 
     def _get_hours(self, store: Dict) -> List[Dict]:

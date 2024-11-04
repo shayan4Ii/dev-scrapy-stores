@@ -46,10 +46,10 @@
 
     "properties": {
       "number": {
-        "type": "string"
+        "type": ["string", "null"]
       },
       "name": {
-        "type": "string"
+        "type": ["string", "null"]
       },
       "address": {
         "type": "string",
