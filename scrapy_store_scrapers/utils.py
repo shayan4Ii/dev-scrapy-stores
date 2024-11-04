@@ -8,7 +8,7 @@ from scrapy.http import Response, Request
 def convert_to_12h_format(time_str: str) -> str:
     """Convert time to 12-hour format."""
     if not time_str:
-        return ""
+        return None
     try:
         time_str = time_str.lower().replace("am", "").replace("pm","").strip()
         if ":" in time_str:

@@ -16,6 +16,31 @@
               "pattern": "^(0?[1-9]|1[0-2]):[0-5][0-9]\\s*(?i)(am|pm)$"
             }
           }
+        },
+        "weekendSchedule": {
+          "type": "object", 
+          "additionalProperties": false,
+          "required": ["open", "close"],
+          "properties": {
+            "open": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(0?[1-9]|1[0-2]):[0-5][0-9]\\s*(?i)(am|pm)$"
+                },
+                {"type": "null"}
+              ]
+            },
+            "close": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(0?[1-9]|1[0-2]):[0-5][0-9]\\s*(?i)(am|pm)$"
+                },
+                {"type": "null"}
+              ]
+            }
+          }
         }
     },
 
@@ -28,7 +53,7 @@
       },
       "address": {
         "type": "string",
-        "pattern": "^(.+?),\\s+(.+?)\\s+(\\d{5})$",
+        "pattern": "(\\d{5})$",
         "description": "Address in format: <street>, <city>, <state> <zipcode>"
       },
       "location": {
@@ -73,13 +98,13 @@
           "friday": {"$ref": "#/$defs/daySchedule"},
           "saturday": {
             "oneOf": [
-                  {"$ref": "#/$defs/daySchedule"},
+                  {"$ref": "#/$defs/weekendSchedule"},
                   {"type": "null"}
               ]
             },
           "sunday": {
               "oneOf": [
-                  {"$ref": "#/$defs/daySchedule"},
+                  {"$ref": "#/$defs/weekendSchedule"},
                   {"type": "null"}
               ]
             }
