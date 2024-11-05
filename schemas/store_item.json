@@ -53,7 +53,6 @@
       },
       "address": {
         "type": "string",
-        "pattern": "(\\d{5})$",
         "description": "Address in format: <street>, <city>, <state> <zipcode>"
       },
       "location": {
