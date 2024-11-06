@@ -48,6 +48,9 @@ class AthletaSpider(scrapy.Spider):
             city = info.get("city", "")
             state = info.get("region", "")
             zipcode = info.get("post_code", "")
+            if "-" in zipcode:
+                zipcode = zipcode.split("-")[0]
+
 
             city_state_zip = f"{city}, {state} {zipcode}".strip()
 

@@ -22,6 +22,8 @@ class Bechtel(scrapy.Spider):
     def parse_locations(self, response: Response):
         obj = json.loads(json.loads(response.xpath("//script[contains(text(), 'serializedChunks')]/text()").get().split(";")[0].split("=")[-1].strip())[0])
         for location in obj:
+            if location['Country'] != "USA":
+                continue
             yield {
                 "name": location["OfficeTitle"],
                 "address": self._get_address(location),
@@ -46,8 +48,11 @@ class Bechtel(scrapy.Spider):
             city = location['City']
             state = location['State']
             zipcode = location['Zip']
+            if "-" in zipcode:
+                zipcode = zipcode.split("-")[0]
 
             city_state_zip = f"{city}, {state} {zipcode}".strip()
+
 
             address = ", ".join(filter(None, [street, city_state_zip])).strip("-")
             address = re.sub(r"\s+", " ", address).strip()

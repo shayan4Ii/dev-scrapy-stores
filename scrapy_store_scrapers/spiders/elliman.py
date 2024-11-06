@@ -11,7 +11,6 @@ class Elliman(scrapy.Spider):
     page_count = 1
     custom_settings = dict(
         DOWNLOAD_HANDLERS = {
-            "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
             "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
         },
         USER_AGENT = None,
