@@ -2,15 +2,14 @@ import scrapy
 from scrapy_store_scrapers.utils import *
 
 
-
-class BananaRepublicSpider(scrapy.Spider):
-    name = "bananarepublic"
+class AthletaSpider(scrapy.Spider):
+    name = "athleta"
 
 
     def start_requests(self) -> Iterable[scrapy.Request]:
         zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
         for zipcode in zipcodes:
-            url = f"https://bananarepublic.gap.com/stores/maps/api/getAsyncLocations?template=search&level=search&search={zipcode['zipcode']}"
+            url = f"https://athleta.gap.com/stores/maps/api/getAsyncLocations?template=search&level=search&search={zipcode['zipcode']}"
             yield scrapy.Request(url, callback=self.parse_stores)
 
 
@@ -73,3 +72,4 @@ class BananaRepublicSpider(scrapy.Spider):
         except Exception as e:
             self.logger.error("Error getting hours: %s", e, exc_info=True)
             return {}
+
