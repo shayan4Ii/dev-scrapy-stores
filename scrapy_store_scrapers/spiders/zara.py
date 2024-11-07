@@ -40,6 +40,7 @@ class Zara(scrapy.Spider):
             },
             "hours": self._get_hours(store.get('openingHours', {}).get('schedule', [])),
             "url": store['url'],
+            "services": [attr.get('title') for attr in store.get('attributes', [])],
             "raw": store
         }
 
