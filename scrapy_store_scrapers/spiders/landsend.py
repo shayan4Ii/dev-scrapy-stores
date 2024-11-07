@@ -2,7 +2,6 @@ import scrapy
 from scrapy_store_scrapers.utils import *
 
 
-
 class LandSend(scrapy.Spider):
     name = "landsend"
     custom_settings = {
@@ -60,41 +59,17 @@ class LandSend(scrapy.Spider):
             self.logger.error("Error getting address: %s", e, exc_info=True)
             return ""
 
-
     def _get_hours(self, marker: scrapy.Selector) -> List[Dict]:
-        hours = {}
-        days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        """Extract and parse store hours."""
         try:
             hours_string = marker.xpath("./@storehours").get()
-            # 'Mon-Sat 10 am-7 pm Sun 11 am-6 pm '
-            if 'closed' not in hours_string.lower():
-                sunday_open, sunday_close = hours_string.split("Sun")[-1].strip().split("-")
-                hours['sunday'] = {
-                    "open": convert_to_12h_format(sunday_open),
-                    "close": convert_to_12h_format(sunday_close)
-                }
-            # 'Mon-Thurs 10am-8pm Fri-Sat 10am-9pm Sun 11am-6pm'
-            if 'mon-sat' in hours_string.lower():
-                rest_days_open, rest_days_close = hours_string.split("Sun")[0].lower().strip("mon-sat").split("-")
-                for day in days[:-1]:
-                    hours[day] = {
-                        "open": convert_to_12h_format(rest_days_open.strip()),
-                        "close": convert_to_12h_format(rest_days_close.strip())
-                    }
-            elif "fri-sat" in hours_string.lower():
-                fri_sat_open, fri_sat_close = hours_string.split("Sun")[0].lower().split("fri-sat")[-1].split("-")
-                for day in days[-3:-1]:
-                    hours[day] = {
-                        "open": convert_to_12h_format(fri_sat_open.strip()),
-                        "close": convert_to_12h_format(fri_sat_close.strip())
-                    }
-                mon_thurs_open, mon_thurs_close = hours_string.split("Sun")[0].lower().split("fri-sat")[0].split("mon-thurs")[-1].split("-")
-                for day in days[:-3]:
-                    hours[day] = {
-                        "open": convert_to_12h_format(mon_thurs_open.strip()),
-                        "close": convert_to_12h_format(mon_thurs_close.strip())
-                    }
-            return hours
+            if not hours_string:
+                self.logger.warning(f"No hours found for store")
+                return {}
+
+            hours_example = HoursExample()
+            normalized_hours = hours_example.normalize_hours_text(hours_string)
+            return hours_example._parse_business_hours(normalized_hours)
         except Exception as e:
-            self.logger.error("Error getting hours: %s", e, exc_info=True)
-            return []
+            self.logger.error(f"Error getting store hours: {e}", exc_info=True)
+            return {}

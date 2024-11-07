@@ -85,8 +85,8 @@ class HoursExample():
                 if result[full_day]['open'] and result[full_day]['close']:
                     self.logger.debug(f"Day {full_day} already has hours({input_text=}), skipping range {start_day} to {end_day}")
                     continue
-                result[full_day]['open'] = open_time
-                result[full_day]['close'] = close_time
+                result[full_day]['open'] = convert_to_12h_format(open_time)
+                result[full_day]['close'] = convert_to_12h_format(close_time)
 
         # Extract and process individual days (overwriting any conflicting day ranges)
         single_days = self._extract_business_hours(input_text)
@@ -95,8 +95,8 @@ class HoursExample():
             if result[full_day]['open'] and result[full_day]['close']:
                 self.logger.debug(f"Day {full_day} already has hours({input_text=}), skipping individual day {day}")
                 continue
-            result[full_day]['open'] = open_time
-            result[full_day]['close'] = close_time
+            result[full_day]['open'] = convert_to_12h_format(open_time)
+            result[full_day]['close'] = convert_to_12h_format(close_time)
 
         # Log warning for any missing days
         for day, hours in result.items():
