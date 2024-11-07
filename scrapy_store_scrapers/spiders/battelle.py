@@ -30,7 +30,7 @@ class Battelle(scrapy.Spider):
                 continue
             yield {
                 "name": location.xpath(".//h3/text()").get(),
-                "address": location.xpath(".//strong[contains(text(), 'Street Address')]/following-sibling::text()").get().strip().split("-")[0],
+                "address": location.xpath(".//strong[contains(text(), 'Street Address')]/following-sibling::text()").get().strip().split("-")[0].strip(": "),
                 "location": {
                     "type": "Point",
                     "coordinates": [float(coordinates[1]), float(coordinates[0])]

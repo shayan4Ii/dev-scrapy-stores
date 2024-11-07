@@ -119,6 +119,9 @@
       },
       "raw": {
         "type": "object"
+      },
+      "coming_soon": {
+        "type": "boolean"
       }
     },
     "required": [

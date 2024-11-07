@@ -23,6 +23,8 @@ class PureBarre(scrapy.Spider):
     def parse_locations(self, response):
         data = json.loads(response.text)['locations']
         for location in data:
+            if location['country_code'] != "US":
+                continue
             partial_item = {
                 "number": f"{location['seq']}",
                 "name": location['name'],
@@ -35,6 +37,7 @@ class PureBarre(scrapy.Spider):
                 "hours": {},
                 "url": f"https://www.purebarre.com/location/{location['site_slug']}",
                 "raw": location,
+                "coming_soon": location['coming_soon']
             }
             yield scrapy.Request(
                 url=f"https://www.purebarre.com/location/{location['site_slug']}",

@@ -9,30 +9,46 @@ class Deloitte(scrapy.Spider):
     start_urls = ["https://www2.deloitte.com/us/en/footerlinks/office-locator.html"]
 
 
-    def parse(self, response):
+    def parse(self, response: Response): # //script[contains(text(), 'GeoCoordinates')]
         for office in response.xpath("//div[@class='offices']"):
-            yield {
-                "name": office.xpath(".//h3/a/text()").get().strip(),
-                "address": " ".join([re.sub(r'\s+\t+', " ", line) for line in office.xpath("./div[@class='address']/p/text()").getall()[:-1]]).strip(),
-                "phone_number": office.xpath("./div[@class='contact']/p/a/text()").get('').strip(),
-                "location": self._get_location(office.xpath(".//a[@class='view_map']/@href").get()),
-                "url":  response.urljoin(office.xpath(".//h3/a/@href").get().strip()),
-            }
+            yield response.follow(
+                url=office.xpath(".//h3/a/@href").get(),
+                callback=self.parse_office
+            )
 
-
-    def _get_location(self, map_url: str):
-        coordinates = parse_qs(urlparse(map_url).query).get("sll") or parse_qs(urlparse(map_url).query).get("ll")
-        if coordinates is None:
-            if "/maps/place" in map_url:
-                coordinates = map_url.split("/@")[-1].split("/")[0].split(",")[:-1]
-                if len(coordinates) != 2:
-                    return None
-            else:
-                return None
-        else:
-            coordinates = coordinates[0].split(",")
-        
-        return {
-            "type": "Point",
-            "coordinates": [float(coordinates[1]), float(coordinates[0])]
+    def parse_office(self, response: Response):
+        obj = response.xpath("//script[contains(text(), 'GeoCoordinates')]/text()").get()
+        if obj is None:
+            return
+        office = json.loads(obj)
+        yield {
+            "name": office['name'],
+            "address": self._get_address(office['address']),
+            "phone_number": office.get('telephone')[0] if office.get('telephone') else None,
+            "location": {
+                "type": "Point",
+                "coordinates": [office['geo']['longitude'], office['geo']['latitude']]
+            },
+            "url":  response.url,
+            "raw": office
         }
+
+
+    def _get_address(self, address: Dict) -> str:
+        try:
+            address_parts = [i for i in address.get("streetAddress") if i]
+
+            street = ", ".join(filter(None, address_parts))
+
+            city = address.get("addressLocality", "")
+            state = address.get("addressRegion", "")
+            zipcode = address.get("postalCode", "")
+            if "-" in zipcode:
+                zipcode = zipcode.split("-")[0]
+
+            city_state_zip = f"{city}, {state} {zipcode}".strip()
+
+            return ", ".join(filter(None, [street, city_state_zip])).replace("\u200b","").replace(", ,", ",").strip()
+        except Exception as e:
+            self.logger.error("Error getting address: %s", e, exc_info=True)
+            return ""
