@@ -17,10 +17,8 @@ class Uniqlo(scrapy.Spider):
 
 
     def start_requests(self) -> Iterable[Request]:
-        zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
-        for zipcode in zipcodes:    
-            url = f"https://map.uniqlo.com/us/api/storelocator/v1/en/stores?limit=100&offset=0&lang=english&RESET=true&r=storelocator&latitude={zipcode['latitude']}&longitude={zipcode['longitude']}&distance=10&unitForDistance=mi"
-            yield scrapy.Request(url, callback=self.parse, meta={"impersonate": "chrome"})
+        url = "https://map.uniqlo.com/us/api/storelocator/v1/en/stores?limit=100&RESET=true&lang=english&offset=0&r=storelocator"
+        yield scrapy.Request(url, callback=self.parse, meta={"impersonate": "chrome"})
 
 
     def parse(self, response: Response) -> Iterable[Dict]:
