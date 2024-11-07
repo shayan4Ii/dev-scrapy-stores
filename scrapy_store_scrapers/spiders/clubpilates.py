@@ -15,6 +15,8 @@ class ClubPilatesSpider(scrapy.Spider):
     def parse_locations(self, response):
         data = json.loads(response.text)['locations']
         for location in data:
+            if location['country_code'] != 'US':
+                continue
             partial_item = {
                 "number": f"{location['seq']}",
                 "name": location['name'],
@@ -64,7 +66,7 @@ class ClubPilatesSpider(scrapy.Spider):
 
             city_state_zip = f"{city}, {state} {zipcode}".strip()
 
-            return ", ".join(filter(None, [street, city_state_zip]))
+            return ", ".join(filter(None, [street, city_state_zip])).replace(",,",",")
         except Exception as e:
             self.logger.error("Error getting address: %s", e, exc_info=True)
             return ""
