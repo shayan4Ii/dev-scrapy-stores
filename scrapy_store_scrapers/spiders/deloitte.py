@@ -36,7 +36,7 @@ class Deloitte(scrapy.Spider):
 
     def _get_address(self, address: Dict) -> str:
         try:
-            address_parts = [i for i in address.get("streetAddress") if i]
+            address_parts = [i for i in address.get("streetAddress") if i.strip()]
 
             street = ", ".join(filter(None, address_parts))
 
