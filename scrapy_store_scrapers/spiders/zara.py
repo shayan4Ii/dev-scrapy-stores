@@ -1,5 +1,6 @@
 import scrapy
 from scrapy_store_scrapers.utils import *
+import chompjs
 
 
 
@@ -16,39 +17,42 @@ class Zara(scrapy.Spider):
 
 
     def start_requests(self) -> Iterable[scrapy.Request]:
-        zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
-        for zipcode in zipcodes:
-            url = f"https://www.zara.com/us/en/stores-locator/extended/search?lat={zipcode['latitude']}&lng={zipcode['longitude']}&isDonationOnly=false&skipRestrictions=true&ajax=true"
-            yield scrapy.Request(url, callback=self.parse)
+        url = "https://www.zara.com/us/en/z-stores-st1404.html?v1=11108"
+        yield scrapy.Request(url, callback=self.parse)
 
 
     def parse(self, response: Response) -> Iterable[Dict]:
-        stores = json.loads(response.text)
+        stores = response.xpath("//li[@class='store-sub-accordions__city-stores-item']/a/@href").getall()
         for store in stores:
-            yield {
-                "number":f"{store['id']}",
-                "name": store.get('name'),
-                "address": self._get_address(store),
-                "phone_number": store.get("phones")[0] if store.get("phones") else None,
-                "location": {
-                    "type": "Point",
-                    "coordinates": [store['longitude'], store['latitude']]
-                },
-                "hours": self._get_hours(store),
-                "url": store['url'],
-                "raw": store
-            }
+            yield scrapy.Request(store, callback=self.parse_store)
+
+
+    def parse_store(self, response: Response) -> Iterable[Dict]:
+        store = list(chompjs.parse_js_objects(response.xpath("//script[contains(text(), 'appConfig')]/text()").get().strip(";").strip("window.zara.appConfig = ")))[-1]['physicalStoreExtendedDetails']
+        yield {
+            "number": store['id'],
+            "name": store.get('commercialName'),
+            "address": self._get_address(store),
+            "phone_number": store.get("phone"),
+            "location": {
+                "type": "Point",
+                "coordinates": [store['coordinates']['longitude'], store['coordinates']['latitude']]
+            },
+            "hours": self._get_hours(store.get('openingHours', {}).get('schedule', [])),
+            "url": store['url'],
+            "raw": store
+        }
 
 
     def _get_address(self, store: Dict) -> str:
         try:
             address_parts = [
-                store['addressLines'][0],
+                store['address'],
             ]
             street = ", ".join(filter(None, address_parts))
 
             city = store.get("city", "")
-            state = store.get("stateCode", "")
+            state = store.get("province", "")
             zipcode = store.get("zipCode", "")
 
             city_state_zip = f"{city}, {state} {zipcode}".strip()
@@ -59,7 +63,7 @@ class Zara(scrapy.Spider):
             return ""
         
 
-    def _get_hours(self, store: Dict) -> Dict:
+    def _get_hours(self, opening_hours: List[Dict]) -> Dict:
         hours = {}
         days = {
             1: "monday",
@@ -72,11 +76,13 @@ class Zara(scrapy.Spider):
         }
         try:
             for idx, day in days.items():
-                for hour in store['openingHours']:
-                    if hour['weekDay'] == idx:
+                for opening_hour in opening_hours:
+                    if opening_hour['weekDay'] == idx:
+                        if not opening_hour['hours']:
+                            continue
                         hours[day] = {
-                            "open": convert_to_12h_format(hour['openingHoursInterval'][0]['openTime']),
-                            "close": convert_to_12h_format(hour['openingHoursInterval'][0]['closeTime'])
+                            "open": convert_to_12h_format(opening_hour['hours'][0]),
+                            "close": convert_to_12h_format(opening_hour['hours'][-1])
                         }
             return hours
         except Exception as e:
