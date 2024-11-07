@@ -15,6 +15,8 @@ class Hm(scrapy.Spider):
     def parse(self, response: Response) -> Iterable[Dict]:
         stores = json.loads(response.text)['stores']
         for store in stores:
+            if store.get("region", {}).get("name", "") == "Puerto Rico":
+                continue
             yield {
                 "number": store['storeCode'],
                 "name": store['name'],
