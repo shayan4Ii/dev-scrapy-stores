@@ -14,6 +14,8 @@
 | phone_number | Optional | String | Phone number | Contact number for the store |
 | hours | Optional | Object | Day-based operating hours | Operating hours organized by day |
 | services | Optional | Array | List of strings | Available services at the location |
+| permanently_closed | Optional | Boolean | True/False | Indicates if the location is permanently closed |
+| coming_soon | Optional | Boolean | True/False | Indicates if the location is opening soon |
 | url | Required | String | Valid URL | Source URL where the data was scraped from |
 | raw | Required | Object | Original data | Complete raw data from source |
 
