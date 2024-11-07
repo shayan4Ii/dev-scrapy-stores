@@ -25,9 +25,30 @@ class Uniqlo(scrapy.Spider):
         obj = json.loads(response.text)
         if obj.get("status", "") == "ok":
             stores = obj['result'].get('stores', [])
+            total_stores = obj['result'].get('total', 0)
+            current_offset = response.meta.get('offset', 0)
+            
+            # Process current batch of stores
             for store in stores:    
                 url = f"https://map.uniqlo.com/us/api/storelocator/v1/en/stores/{store['id']}"
-                yield scrapy.Request(url, callback=self.parse_store, meta={"impersonate": "chrome"})
+                yield scrapy.Request(
+                    url, 
+                    callback=self.parse_store, 
+                    meta={"impersonate": "chrome"}
+                )
+            
+            # Check if there are more stores to fetch
+            if current_offset + len(stores) < total_stores:
+                next_offset = current_offset + 100
+                next_url = f"https://map.uniqlo.com/us/api/storelocator/v1/en/stores?limit=100&RESET=true&lang=english&offset={next_offset}&r=storelocator"
+                yield scrapy.Request(
+                    next_url,
+                    callback=self.parse,
+                    meta={
+                        "impersonate": "chrome",
+                        "offset": next_offset
+                    }
+                )
         else:
             self.logger.error("Error fetching stores: %s", response.url)
 
