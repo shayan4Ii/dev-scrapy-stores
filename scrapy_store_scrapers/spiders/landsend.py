@@ -28,7 +28,7 @@ class LandSend(scrapy.Spider):
             for marker in response.xpath("//markers/marker"):
                 yield {
                     "number": marker.xpath("./@storenumber").get(),
-                    "name": marker.xpath("./@name").get(),
+                    "name": marker.xpath("./@location").get(),
                     "address": self._get_address(marker),
                     "phone_number": marker.xpath("./@phonenumber").get(),
                     "location": {
@@ -45,13 +45,13 @@ class LandSend(scrapy.Spider):
     def _get_address(self, response: Response) -> str:
         try:
             address_parts = [
-                response.xpath("//markers/marker/@address").get(),
+                response.xpath("./@address").get(),
             ]
             street = ", ".join(filter(None, address_parts))
 
-            city = response.xpath("//markers/marker/@city").get()
-            state = response.xpath("//markers/marker/@state").get()
-            zipcode = response.xpath("//markers/marker/@zip").get()
+            city = response.xpath("./@city").get()
+            state = response.xpath("./@state").get()
+            zipcode = response.xpath("./@zip").get()
 
             city_state_zip = f"{city}, {state} {zipcode}".strip()
 
