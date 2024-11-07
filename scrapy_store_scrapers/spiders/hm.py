@@ -8,10 +8,8 @@ class Hm(scrapy.Spider):
 
 
     def start_requests(self) -> Iterable[scrapy.Request]:
-        zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
-        for zipcode in zipcodes:    
-            url = f"https://api.storelocator.hmgroup.tech/v2/brand/hm/stores/locale/en_us/latitude/{zipcode['latitude']}/longitude/{zipcode['longitude']}/radiusinmeters/10000?_type=json&campaigns=true&departments=true&openinghours=true&maxnumberofstores=100"
-            yield scrapy.Request(url, callback=self.parse)
+        url = f"https://api.storelocator.hmgroup.tech/v2/brand/hm/stores/locale/en_us/country/US?_type=json&campaigns=true&departments=true&openinghours=true&maxnumberofstores=100"
+        yield scrapy.Request(url, callback=self.parse)
 
 
     def parse(self, response: Response) -> Iterable[Dict]:
@@ -45,7 +43,7 @@ class Hm(scrapy.Spider):
 
             city_state_zip = f"{city}, {state} {zipcode}".strip()
 
-            return ", ".join(filter(None, [street, city_state_zip]))
+            return ", ".join(filter(None, [street, city_state_zip])).strip(" US")
         except Exception as e:
             self.logger.error("Error getting address: %s", e, exc_info=True)
             return ""
