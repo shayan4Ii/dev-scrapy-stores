@@ -140,19 +140,3 @@ SPIDERMON_VALIDATION_ADD_ERRORS_TO_ITEMS = True
 SPIDERMON_VALIDATION_DROP_ITEMS_WITH_ERRORS = True
 
 SPIDERMON_SPIDER_CLOSE_MONITORS = ["scrapy_store_scrapers.monitors.SpiderCloseMonitorSuite"]
-
-
-def should_abort_request(request):
-    not_allowed = [".facebook.net","googlemanager.com","stackadapt.com","google-analytics.com","clarity.ms","googletagmanager.com"
-                   "youtube.com"]
-    return (
-        request.resource_type == "image"
-        or ".jpg" in request.url
-        or ".woff" in request.url
-        or any([True for domain in not_allowed if domain in request.url])
-    )
-
-PLAYWRIGHT_ABORT_REQUEST = should_abort_request
-PLAYWRIGHT_BROWSER_TYPE = "firefox"
-PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = 30*1000
-PLAYWRIGHT_MAX_CONTEXTS = 1

@@ -6,10 +6,26 @@ from scrapy.spidermiddlewares.httperror import HttpError
 from twisted.python.failure import Failure
 
 
+
+def should_abort_request(request):
+    not_allowed = [".facebook.net","googlemanager.com","stackadapt.com","google-analytics.com","clarity.ms","googletagmanager.com"
+                   "youtube.com"]
+    return (
+        request.resource_type == "image"
+        or ".jpg" in request.url
+        or ".woff" in request.url
+        or any([True for domain in not_allowed if domain in request.url])
+    )
+
+
 class Elliman(scrapy.Spider):
     name = "elliman"
     page_count = 1
     custom_settings = dict(
+        PLAYWRIGHT_ABORT_REQUEST = should_abort_request,
+        PLAYWRIGHT_BROWSER_TYPE = "firefox",
+        PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = 30*1000,
+        PLAYWRIGHT_MAX_CONTEXTS = 1,
         DOWNLOAD_HANDLERS = {
             "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
         },

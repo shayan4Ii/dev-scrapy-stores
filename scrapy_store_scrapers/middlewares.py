@@ -3,8 +3,8 @@
 # See documentation in:
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-from scrapy import signals
-
+from scrapy import signals, Request
+from scrapy_playwright.page import PageMethod
 # useful for handling different item types with a single interface
 from itemadapter import is_item, ItemAdapter
 
@@ -112,7 +112,30 @@ class ScrapyStoreScrapersDownloaderMiddleware:
         # - return None: continue processing this exception
         # - return a Response object: stops process_exception() chain
         # - return a Request object: stops process_exception() chain
-        pass
+        if spider.name == "nordstromrack":
+            if spider.sitemap_retries >= 3:
+                spider.logger.info(
+                    "Caught exception: %s for request %s, skipping",
+                    exception.__class__,
+                    request,
+                )
+                return None
+            spider.sitemap_retries += 1
+            spider.logger.info(
+                "Caught exception: %s for request %s, retrying",
+                exception.__class__,
+                request,
+            )
+            return Request(
+                url=request.url,
+                meta={
+                    "playwright": True,
+                    "playwright_page_methods": [
+                        PageMethod("wait_for_selector", "//div[@id='product-results-view']", timeout=10*1000)
+                    ]
+                },
+                dont_filter=True,
+            )
 
     def spider_opened(self, spider):
         spider.logger.info("Spider opened: %s" % spider.name)
