@@ -15,7 +15,9 @@ def convert_to_12h_format(time_str: str) -> str:
             _format = '%H:%M'
         elif "." in time_str:
             _format = '%H.%M'
-        else:
+        elif time_str.isdigit() and len(time_str) == 4:
+            _format = '%H%M'
+        else:   
             _format = '%H'
         time_obj = datetime.strptime(time_str, _format).time()
         return time_obj.strftime('%I:%M %p').lower().lstrip('0')
