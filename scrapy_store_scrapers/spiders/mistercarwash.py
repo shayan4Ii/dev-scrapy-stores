@@ -4,21 +4,30 @@ from scrapy_store_scrapers.utils import *
 
 
 
+
 class MisterCarwash(scrapy.Spider):
     name = "mistercarwash"
+    custom_settings = dict(
+        DOWNLOAD_HANDLERS = {
+            "http": "scrapy_impersonate.ImpersonateDownloadHandler",
+            "https": "scrapy_impersonate.ImpersonateDownloadHandler",
+        },
+        USER_AGENT = None
+    )
 
 
     def start_requests(self) -> Iterable[Request]:
-        zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
-        for zipcode in zipcodes:
-            yield scrapy.Request(
-                url=f"https://mistercarwash.com/api/v1/locations/getbydistance?cLat={zipcode['latitude']}&cLng={zipcode['longitude']}&radius=100&cityName=&stateName=&allServices=false", 
-                callback=self.parse
-            )
+        yield scrapy.Request(
+            url=f"https://mistercarwash.com/api/v1/locations/getbydistance?cLat=32.8532871&cLng=-96.8297403&radius=100&cityName=&stateName=&allServices=true", 
+            callback=self.parse,
+            meta={"impersonate": "chrome"}
+        )
 
     
     def parse(self, response: Response):
-        stores = json.loads(response.text)['data']['body']['locationServicePriceDetailsModel']
+        stores = json.loads(response.text)['data']['body']
+        if isinstance(stores, str):
+            return
         for store in stores:
             yield {
                 "number": store['storeNumber'],
@@ -32,10 +41,10 @@ class MisterCarwash(scrapy.Spider):
                         store["latitude"]
                     ]
                 },
-                "services": [service['name'] for service in store['services']],
+                "services": list(set([service['name'] for service in store['services'] if service['name']])),
                 "hours": self._get_hours(store),
                 "url": f"https://mistercarwash.com/store/{store['name'].replace(' ','-')}/",
-                "raw": store
+                # "raw": store
             }
 
 
@@ -67,9 +76,11 @@ class MisterCarwash(scrapy.Spider):
             for hour_range in store['hours']:
                 for day in days:
                     if hour_range['dayOfWeek'].lower() in day:
+                        if hour_range.get("localStartTime") is None:
+                            break
                         hours[day.lower()] = {
-                            "open": convert_to_12h_format(hour_range['localStartTime']),
-                            "close": convert_to_12h_format(hour_range['localEndTime'])
+                            "open": convert_to_12h_format(hour_range.get('localStartTime').replace(":00", "", 1)),
+                            "close": convert_to_12h_format(hour_range.get('localEndTime').replace(":00", "", 1))
                         }
                         break
             return hours
