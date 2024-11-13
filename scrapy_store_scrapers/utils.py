@@ -3,7 +3,15 @@ from typing import Dict, Iterable, Any, Generator, Union, List
 import json
 from scrapy.http import Response, Request
 
-
+def should_abort_request(request):
+    not_allowed = [".facebook.net","googlemanager.com","stackadapt.com","google-analytics.com","clarity.ms","googletagmanager.com"
+                   "youtube.com"]
+    return (
+        request.resource_type == "image"
+        or ".jpg" in request.url
+        or ".woff" in request.url
+        or any([True for domain in not_allowed if domain in request.url])
+    )
 
 def convert_to_12h_format(time_str: str) -> str:
     """Convert time to 12-hour format."""

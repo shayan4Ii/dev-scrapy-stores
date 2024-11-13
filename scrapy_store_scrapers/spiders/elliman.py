@@ -7,15 +7,6 @@ from twisted.python.failure import Failure
 
 
 
-def should_abort_request(request):
-    not_allowed = [".facebook.net","googlemanager.com","stackadapt.com","google-analytics.com","clarity.ms","googletagmanager.com"
-                   "youtube.com"]
-    return (
-        request.resource_type == "image"
-        or ".jpg" in request.url
-        or ".woff" in request.url
-        or any([True for domain in not_allowed if domain in request.url])
-    )
 
 
 class Elliman(scrapy.Spider):

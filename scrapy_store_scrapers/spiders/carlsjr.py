@@ -1,11 +1,11 @@
+import copy
 import scrapy
 from scrapy_store_scrapers.utils import *
 
 
-
-class Wendys(scrapy.Spider):
-    name = "wendys"
-    start_urls = ["https://locations.wendys.com/united-states"]
+class CarlsJr(scrapy.Spider):
+    name = "carlsjr"
+    start_urls = ["https://locations.carlsjr.com/"]
 
 
     def parse(self, response: Response):
@@ -19,14 +19,14 @@ class Wendys(scrapy.Spider):
 
     
     def parse_city(self, response: Response):
-        stores = response.xpath("//a[contains(@class,'Teaser-titleLink')]/@href").getall()
+        stores = response.xpath("//a[contains(@class,'Teaser-ctaLink')]/@href").getall()
         yield from response.follow_all(stores, self.parse_store)
 
 
     def parse_store(self, response: Response):
         yield {
             "name": response.xpath("//h1/text()").get(),
-            "phone_number": response.xpath("//a[@data-ya-track='mainphone']/text()").get(),
+            "phone_number": response.xpath("//a[@data-ya-track='phone']/text()").get(),
             "address": self._get_address(response),
             "location": {
                 "type": "Point",
@@ -43,13 +43,13 @@ class Wendys(scrapy.Spider):
     def _get_address(self, response: Response) -> str:
         try:
             address_parts = [
-                response.xpath("//address[@itemprop='address']//span[@class='c-address-street-1']/text()").get(),
+                response.xpath("//meta[@itemprop='streetAddress']/text()").get(),
             ]
             street = ", ".join(filter(None, address_parts))
 
-            city = response.xpath("//meta[@itemprop='addressLocality']/@content").get()
+            city = response.xpath("//span[@class='Address-field Address-city']/text()").get()
             state = response.xpath("//abbr[@itemprop='addressRegion']/text()").get()
-            zipcode = response.xpath("//span[@itemprop='postalCode']/text()").get()
+            zipcode = response.xpath("//span[@class='Address-field Address-postalCode']/text()").get()
             if "-" in zipcode:
                 zipcode = zipcode.split("-")[0]
 
@@ -62,28 +62,18 @@ class Wendys(scrapy.Spider):
         
 
     def _get_hours(self, response: Response) -> dict:
-        days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
         hours = {}
         try:
-            for row in response.xpath("//h4[contains(text(), 'Rest')]/following-sibling::div/table[@class='c-location-hours-details']/tbody/tr"):
-                for day in days:
-                    content = row.xpath("./@content").get().lower()
-                    if "all day" in content:
-                        hours[day] = {
-                            "open": "12:00 am",
-                            "close": "11:59 pm"
-                        }
-                        break
-                    elif "closed" in content:
-                        continue
-                    d, hour_range = content.split(" ")
-                    if day.startswith(d.lower()):
-                        open_time, close_time = hour_range.split("-")
-                        hours[day] = {
-                            "open": convert_to_12h_format(open_time),
-                            "close": convert_to_12h_format(close_time)
-                        }
-                        break
+            hours_range = json.loads(response.xpath("//div[@class='c-hours-details-wrapper js-hours-table']/@data-days").get())
+            for day, hour_rng in zip(days, hours_range):
+                hours[day] = {
+                    "open": convert_to_12h_format(hour_rng[0]),
+                    "close": convert_to_12h_format(hour_rng[1])
+                }
+            for day, hour_range in copy.deepcopy(hours).items():
+                if hour_range['open'] is None and hour_range['close'] is None:
+                    del hours[day]
             return hours
         except Exception as e:
             self.logger.error("Error getting hours: %s", e, exc_info=True)
