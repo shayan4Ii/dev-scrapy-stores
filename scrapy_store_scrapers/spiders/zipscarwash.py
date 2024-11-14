@@ -44,8 +44,8 @@ class Zipscarwash(scrapy.Spider):
                 "location": {
                     "type": "Point",
                     "coordinates": [
-                        float(location["lon"]),
-                        float(location["lat"])
+                        float(location["longitude"]),
+                        float(location["latitude"])
                     ]
                 },
                 "services": [" ".join(row.xpath(".//p/text()").getall()).strip("-").strip() for row in scrapy.Selector(text=json.loads(response.text)['locations'][0]['rows']).xpath("//tr")],
