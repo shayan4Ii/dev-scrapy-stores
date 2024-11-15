@@ -85,7 +85,7 @@ class Bk(scrapy.Spider):
                 },
                 "address": self._get_address(node['physicalAddress']),
                 "phone_number": node['phoneNumber'],
-                "hours": self._get_hours(node['curbsideHours']),
+                "hours": self._get_hours(node),
                 "raw": node
             }
 
@@ -110,28 +110,9 @@ class Bk(scrapy.Spider):
         except Exception as e:
             self.logger.error("Error getting address: %s", e, exc_info=True)
             return ""
-        
+  
 
-    def _get_hours(self, hours_data: Dict) -> Dict:
-        days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-        new_item = {}
-        try:
-            for day in days:
-                for d, hours in hours_data.items():
-                    if d.lower() == day:
-                        if isinstance(hours, str):
-                            continue
-                        new_item[day] = {
-                            "open": convert_to_12h_format(hours[0]['open']),
-                            "close": convert_to_12h_format(hours[0]['close'])
-                        }
-            return new_item
-        except Exception as e:
-            self.logger.error("Error getting hours: %s", e, exc_info=True)
-            return {}
-
-
-    def _get_hours(self, hours_data: Dict) -> Dict:
+    def _get_hours(self, node: Dict) -> Dict:
         key_day_mapping = {
             "mon": "monday",
             "tue": "tuesday",
@@ -143,14 +124,21 @@ class Bk(scrapy.Spider):
         }
         hours = {}
         try:
-            for day in key_day_mapping:
-                parital_key = day[:3]
-                if hours_data[parital_key+"Open"] is None or hours_data[parital_key+"Close"] is None:
-                    continue
-                hours[key_day_mapping[day]] = {
-                    "open": convert_to_12h_format(hours_data[parital_key+"Open"].replace(":00", "")),
-                    "close": convert_to_12h_format(hours_data[parital_key+"Close"].replace(":00", ""))
-                }
+            def get_hours(hours_data: Dict):
+                for key, day in key_day_mapping.items():
+                    if hours_data[key+"Open"] is None or hours_data[key+"Close"] is None:
+                        continue
+                    hours[day] = {
+                        "open": convert_to_12h_format(hours_data[key+"Open"].replace(":00", "")),
+                        "close": convert_to_12h_format(hours_data[key+"Close"].replace(":00", ""))
+                    }
+            get_hours(node.get("curbsideHours", {}))
+            if not hours:
+                get_hours(node.get("deliveryHours", {}))
+            if not hours:
+                get_hours(node.get("diningRoomHours", {}))
+            if not hours:
+                get_hours(node.get("driveThruHours", {}))
             return hours
         except Exception as e:
             self.logger.error("Error getting hours: %s", e, exc_info=True)

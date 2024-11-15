@@ -64,7 +64,7 @@ class RaisingCanes(scrapy.Spider):
                 },
                 "hours": self._get_hours(restaurant_data),
                 "url": restaurant_data['website'],
-                "phone": restaurant_data['mainPhone'],
+                "phone_number": restaurant_data['mainPhone'],
                 "raw": restaurant_data
             }
 

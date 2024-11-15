@@ -3,8 +3,15 @@ from scrapy_store_scrapers.utils import *
 
 
 
+
 class PandaExpress(scrapy.Spider):
     name = "pandaexpress"
+    custom_settings = {
+        "DOWNLOAD_HANDLERS": {
+            "https": "scrapy_impersonate.ImpersonateDownloadHandler",
+        },
+        "USER_AGENT": None
+    }
     headers = {
         "host": "nomnom-prod-api.pandaexpress.com",
         "clientid": "panda",
@@ -12,7 +19,6 @@ class PandaExpress(scrapy.Spider):
         "nomnom-platform": "web",
         "accept": "application/json",
         "content-type": "application/json",
-        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
         "origin": "https://www.pandaexpress.com",
         "referer": "https://www.pandaexpress.com/",
         "accept-encoding": "gzip, deflate, br, zstd",
@@ -23,8 +29,8 @@ class PandaExpress(scrapy.Spider):
     def start_requests(self) -> Iterable[Request]:
         zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
         for zipcode in zipcodes:
-            url = f"https://nomnom-prod-api.pandaexpress.com/restaurants/near?lat={zipcode['latitude']}&long={zipcode['longitude']}&radius=20&limit=100&loyalty_filter=false&nomnom=calendars&nomnom_calendars_from=20241113&nomnom_calendars_to=20241124&nomnom_exclude_extref=99997,99996,99987,99988,99989,99994,11111,8888,99998,99999,0000"
-            yield scrapy.Request(url, callback=self.parse, headers=self.headers)
+            url = f"https://nomnom-prod-api.pandaexpress.com/restaurants/near?lat={zipcode['latitude']}&long={zipcode['longitude']}&radius=20&limit=100&loyalty_filter=false&nomnom=calendars&nomnom_calendars_from=20241115&nomnom_calendars_to=20241124&nomnom_exclude_extref=99997,99996,99987,99988,99989,99994,11111,8888,99998,99999,0000"
+            yield scrapy.Request(url, callback=self.parse, headers=self.headers, meta={"impersonate": "chrome_android"})
 
 
 
@@ -70,17 +76,28 @@ class PandaExpress(scrapy.Spider):
 
 
     def _get_hours(self, restaurant: Dict) -> Dict:
-        days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        days_mapping = {
+            "sun": "sunday",
+            "mon": "monday",
+            "tue": "tuesday",
+            "wed": "wednesday",
+            "thu": "thursday",
+            "fri": "friday",
+            "sat": "saturday"
+        }
         hours = {}
         try:
-            hours_data = restaurant['calendars']['calendar'][0]['ranges'] if restaurant['calendars']['calendar'] else []
-            for day in days:
-                for hour_range in hours_data:
-                    if hour_range['weekday'].lower() in day:
-                        hours[day] = {
-                            "open": convert_to_12h_format(hour_range['start'].split(" ")[1]),
-                            "close": convert_to_12h_format(hour_range['end'].split(" ")[1])
-                        }
+            calendar = restaurant['calendars']['calendar']
+            if not calendar:
+                return {}
+            for _range in calendar[0]['ranges']:
+                day = days_mapping[_range['weekday'].lower()]
+                parsed_date_open = datetime.strptime(_range['start'], "%Y%m%d %H:%M")
+                parsed_date_close = datetime.strptime(_range['end'], "%Y%m%d %H:%M")
+                hours[day] = {
+                    "open": parsed_date_open.strftime("%I:%M %p").lower(),
+                    "close": parsed_date_close.strftime("%I:%M %p").lower()
+                }
             return hours
         except Exception as e:
             self.logger.error("Error getting hours: %s", e, exc_info=True)
