@@ -19,8 +19,12 @@ class Wendys(scrapy.Spider):
 
     
     def parse_city(self, response: Response):
-        stores = response.xpath("//a[contains(@class,'Teaser-titleLink')]/@href").getall()
-        yield from response.follow_all(stores, self.parse_store)
+        is_store_page = response.xpath("//h4[contains(@class, 'contact')]")
+        if is_store_page:
+            yield from self.parse_store(response)
+        else:
+            stores = response.xpath("//a[contains(@class,'Teaser-titleLink')]/@href").getall()
+            yield from response.follow_all(stores, self.parse_store)
 
 
     def parse_store(self, response: Response):
