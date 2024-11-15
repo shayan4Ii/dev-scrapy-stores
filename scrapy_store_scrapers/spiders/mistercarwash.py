@@ -12,16 +12,20 @@ class MisterCarwash(scrapy.Spider):
             "http": "scrapy_impersonate.ImpersonateDownloadHandler",
             "https": "scrapy_impersonate.ImpersonateDownloadHandler",
         },
-        USER_AGENT = None
+        USER_AGENT = None,
+        CONCURRENT_REQUESTS = 4,
+        DOWNLOAD_DELAY = 0.7
     )
 
 
     def start_requests(self) -> Iterable[Request]:
-        yield scrapy.Request(
-            url=f"https://mistercarwash.com/api/v1/locations/getbydistance?cLat=32.8532871&cLng=-96.8297403&radius=100&cityName=&stateName=&allServices=true", 
-            callback=self.parse,
-            meta={"impersonate": "chrome"}
-        )
+        zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
+        for zipcode in zipcodes:
+            yield scrapy.Request(
+                url=f"https://mistercarwash.com/api/v1/locations/getbydistance?cLat={zipcode['latitude']}&cLng={zipcode['longitude']}&radius=100&cityName=&stateName=&allServices=true", 
+                callback=self.parse,
+                meta={"impersonate": "chrome"}
+            )
 
     
     def parse(self, response: Response):
@@ -44,7 +48,7 @@ class MisterCarwash(scrapy.Spider):
                 "services": list(set([service['name'] for service in store['services'] if service['name']])),
                 "hours": self._get_hours(store),
                 "url": f"https://mistercarwash.com/store/{store['name'].replace(' ','-')}/",
-                # "raw": store
+                "raw": store
             }
 
 

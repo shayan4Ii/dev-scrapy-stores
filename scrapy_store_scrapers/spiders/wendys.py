@@ -25,6 +25,7 @@ class Wendys(scrapy.Spider):
 
     def parse_store(self, response: Response):
         yield {
+            "number": response.xpath("//div[@id='LocationInfo-operating']/@data-corporatecode").get(),
             "name": response.xpath("//h1/text()").get(),
             "phone_number": response.xpath("//a[@data-ya-track='mainphone']/text()").get(),
             "address": self._get_address(response),
@@ -36,6 +37,7 @@ class Wendys(scrapy.Spider):
                 ]
             },
             "hours": self._get_hours(response),
+            "services": response.xpath("//span[@itemprop='amenityFeature']/text()").getall(),
             "url": response.url
         }
 
@@ -68,22 +70,25 @@ class Wendys(scrapy.Spider):
             for row in response.xpath("//h4[contains(text(), 'Rest')]/following-sibling::div/table[@class='c-location-hours-details']/tbody/tr"):
                 for day in days:
                     content = row.xpath("./@content").get().lower()
+                    if "closed" in content:
+                        break
                     if "all day" in content:
-                        hours[day] = {
-                            "open": "12:00 am",
-                            "close": "11:59 pm"
-                        }
-                        break
-                    elif "closed" in content:
-                        continue
-                    d, hour_range = content.split(" ")
-                    if day.startswith(d.lower()):
-                        open_time, close_time = hour_range.split("-")
-                        hours[day] = {
-                            "open": convert_to_12h_format(open_time),
-                            "close": convert_to_12h_format(close_time)
-                        }
-                        break
+                        d = content.split("all day")[0].strip()
+                        if day.startswith(d):   
+                            hours[day] = {
+                                "open": "12:00 am",
+                                "close": "11:59 pm"
+                            }
+                            break
+                    elif ":" in content:
+                        d, hour_range = content.split(" ")
+                        if day.startswith(d.strip()):
+                            open_time, close_time = hour_range.split("-")
+                            hours[day] = {
+                                "open": convert_to_12h_format(open_time),
+                                "close": convert_to_12h_format(close_time)
+                            }
+                            break
             return hours
         except Exception as e:
             self.logger.error("Error getting hours: %s", e, exc_info=True)

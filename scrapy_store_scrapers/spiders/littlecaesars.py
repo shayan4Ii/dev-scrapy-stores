@@ -77,6 +77,7 @@ class LittleCaesarsSpider(scrapy.Spider):
                     },
                     "hours": self._get_hours(store['storeHours']),
                     "phone_number": store['phone'],
+                    "services": self._get_services(store['features']),
                     "url": f"https://littlecaesars.com/en-us/store/{store['locationNumber']}/",
                     "raw": store
                 }
@@ -103,16 +104,34 @@ class LittleCaesarsSpider(scrapy.Spider):
             return ""
 
 
-    def _get_hours(self, hours_data: Dict) -> dict:
-        days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+    def _get_hours(self, hours_data: List) -> dict:
         hours = {}
         try:
-            for day, hour_range in zip(days, hours_data):
+            for _date in hours_data:
+                if "closed" in _date['openTime'].lower() or "closed" in _date['closeTime'].lower():
+                    continue
+                parsed_date_open = datetime.strptime(_date['openTime'], "%Y-%m-%dT%H:%M:%S")
+                parsed_date_close = datetime.strptime(_date['closeTime'], "%Y-%m-%dT%H:%M:%S")
+                day = parsed_date_open.strftime("%A").lower()
                 hours[day] = {
-                    "open": convert_to_12h_format(hour_range['openTime'].split("T")[1].replace(":00", "")),
-                    "close": convert_to_12h_format(hour_range['closeTime'].split("T")[1].replace(":00", ""))
+                    "open": parsed_date_open.strftime("%I:%M %p").lower(),
+                    "close": parsed_date_close.strftime("%I:%M %p").lower()
                 }
             return hours
         except Exception as e:
             self.logger.error("Error getting hours: %s", e, exc_info=True)
             return {}
+        
+
+    def _get_services(self, features: List[Dict]) -> List[str]:
+        services = []
+        services_mapping = {
+            "hasDelivery": "Delivery",
+            "hasPortal": "Pizza Portal Pickup",
+            "hasDriveThru": "Drive Thru",
+            "hasOnlineOrdering": "Online Ordering",
+        }
+        for service, value in services_mapping.items():
+            if features.get(service, False):
+                services.append(value)
+        return services

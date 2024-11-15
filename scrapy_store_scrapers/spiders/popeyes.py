@@ -80,7 +80,9 @@ class Popeyes(scrapy.Spider):
                 },
                 "address": self._get_address(node['physicalAddress']),
                 "phone_number": node['phoneNumber'],
-                "hours": self._get_hours(node['curbsideHours']),
+                "services": self._get_services(node),
+                "hours": self._get_hours(node),
+                "url": f"https://www.popeyes.com/store-locator/store/restaurant_{node['storeId']}",
                 "raw": node
             }
 
@@ -105,28 +107,9 @@ class Popeyes(scrapy.Spider):
         except Exception as e:
             self.logger.error("Error getting address: %s", e, exc_info=True)
             return ""
-        
-
-    def _get_hours(self, hours_data: Dict) -> Dict:
-        days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-        new_item = {}
-        try:
-            for day in days:
-                for d, hours in hours_data.items():
-                    if d.lower() == day:
-                        if isinstance(hours, str):
-                            continue
-                        new_item[day] = {
-                            "open": convert_to_12h_format(hours[0]['open']),
-                            "close": convert_to_12h_format(hours[0]['close'])
-                        }
-            return new_item
-        except Exception as e:
-            self.logger.error("Error getting hours: %s", e, exc_info=True)
-            return {}
 
 
-    def _get_hours(self, hours_data: Dict) -> Dict:
+    def _get_hours(self, node: Dict) -> Dict:
         key_day_mapping = {
             "mon": "monday",
             "tue": "tuesday",
@@ -138,15 +121,39 @@ class Popeyes(scrapy.Spider):
         }
         hours = {}
         try:
-            for day in key_day_mapping:
-                parital_key = day[:3]
-                if hours_data[parital_key+"Open"] is None or hours_data[parital_key+"Close"] is None:
-                    continue
-                hours[key_day_mapping[day]] = {
-                    "open": convert_to_12h_format(hours_data[parital_key+"Open"].replace(":00", "")),
-                    "close": convert_to_12h_format(hours_data[parital_key+"Close"].replace(":00", ""))
-                }
+            def get_hours(hours_data: Dict):
+                for day in key_day_mapping:
+                    parital_key = day[:3]
+                    if hours_data[parital_key+"Open"] is None or hours_data[parital_key+"Close"] is None:
+                        continue
+                    hours[key_day_mapping[day]] = {
+                        "open": convert_to_12h_format(hours_data[parital_key+"Open"].replace(":00", "")),
+                        "close": convert_to_12h_format(hours_data[parital_key+"Close"].replace(":00", ""))
+                    }
+            hours_data = node.get('curbsideHours')
+            get_hours(hours_data)
+            if not hours:
+                hours_data = node.get('diningRoomHours')
+                get_hours(hours_data)
+            if not hours:
+                hours_data = node.get("driveThruHours")
+                get_hours(hours_data)
+            if not hours:
+                hours_data = node.get('deliveryHours')
+                get_hours(hours_data)
             return hours
         except Exception as e:
             self.logger.error("Error getting hours: %s", e, exc_info=True)
             return {}
+
+
+    def _get_services(self, node: Dict) -> List[str]:
+        services_mapping = {
+            "hasDriveThru": "Drive Thru",
+            "hasMobileOrdering": "Mobile Ordering",
+        }
+        services = []
+        for key, value in services_mapping.items():
+            if node.get(key):
+                services.append(value)
+        return services

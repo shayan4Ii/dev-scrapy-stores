@@ -38,7 +38,8 @@ class JackInTheBoxSpider(scrapy.Spider):
                 "coordinates": [float(obj['geo']['longitude']), float(obj['geo']['latitude'])]
             },
             "phone_number": obj['telephone'],
-            "hours": self._get_hours(obj['openingHoursSpecification']),
+            "hours": self._get_hours(obj['openingHoursSpecification'], response),
+            "serives": self._get_services(response),
             "url": response.url,
             "raw": obj,
             "coming_soon": False
@@ -70,7 +71,7 @@ class JackInTheBoxSpider(scrapy.Spider):
             return ""
         
 
-    def _get_hours(self, hours_data: Dict) -> Dict:
+    def _get_hours(self, hours_data: Dict, response: Response) -> Dict:
         days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
         hours = {}
         try:
@@ -83,7 +84,38 @@ class JackInTheBoxSpider(scrapy.Spider):
                             "open": hour_range['opens'].lower().replace(".", ""),
                             "close": hour_range['closes'].lower().replace(".", "")
                         }
+            if not hours:
+                for block in response.xpath("//div[@id='hoursAccordion']//div[@id='lobbyHours']/div"):
+                    day = block.xpath("./div[1]/text()").get().strip().lower() # if equal to Today then get the day name from datetime.
+                    if day == "today":
+                        day = datetime.now().strftime("%A").lower()
+                    hour_range = block.xpath("./div[2]/text()").get().strip().lower()
+                    if not hour_range:
+                        continue
+                    hours[day] = {
+                        "open": hour_range.split("to")[0].strip(),
+                        "close": hour_range.split("to")[1].strip()
+                    }
+
             return hours
         except Exception as e:
             self.logger.error("Error getting hours: %s", e, exc_info=True)
             return {}
+    
+    
+    def _get_services(self, response: Response):
+        services = []
+        try:
+            if not response.xpath("//script[contains(text(), 'amenitiesString')]/text()").get():
+                return []
+            services_mapping = chompjs.parse_js_object(response.xpath("//script[contains(text(), 'amenitiesString')]/text()").re_first(r"(?:amenitiesString\s=\s\")(.*?)(?:\")"))
+            for service, status in services_mapping.items():
+                if status == "true":
+                    if 'has_' in service:
+                        service = service.split("has_")[1].strip()
+                    service = service.replace("_", " ").capitalize()
+                    services.append(service)
+            return services
+        except Exception as e:
+            self.logger.error("Error getting services: %s", e, exc_info=True)
+            return []

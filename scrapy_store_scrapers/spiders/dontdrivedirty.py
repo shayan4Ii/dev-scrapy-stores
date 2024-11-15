@@ -9,8 +9,10 @@ class DontDriveDirty(scrapy.Spider):
 
 
     def start_requests(self) -> Iterable[Request]:
-        url = "https://www.dontdrivedirty.com/locationsandpricing/"
-        yield scrapy.Request(url, callback=self.parse)
+        zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
+        for zipcode in zipcodes:
+            url = f"https://www.dontdrivedirty.com/locationsandpricing/?zipcode={zipcode['zipcode']}"
+            yield scrapy.Request(url, callback=self.parse)
 
 
     def parse(self, response: Response):
@@ -23,7 +25,7 @@ class DontDriveDirty(scrapy.Spider):
         if not obj['geo']['latitude'] or not obj['geo']['longitude']:
             return
         yield {
-            "name": obj.get("name"),
+            "name": response.xpath("//h1/text()").get(),
             "phone_number": obj.get("telephone"),
             "address": self._get_address(obj['address']),
             "location": {
@@ -34,7 +36,9 @@ class DontDriveDirty(scrapy.Spider):
                 ]
             },
             "hours": self._get_hours(obj),
+            "services": ["Members Quick Lane"] if response.xpath("//a[contains(@href, 'new-member-perk')]") else [],
             "url": response.url,
+            "coming_soon": "coming soon" in response.xpath("//p[@class='h2' and contains(text(), 'Coming Soon')]/text()").get('').lower(),
             "raw": obj
         }
 

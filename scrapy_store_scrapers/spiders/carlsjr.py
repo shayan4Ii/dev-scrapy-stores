@@ -26,7 +26,7 @@ class CarlsJr(scrapy.Spider):
     def parse_store(self, response: Response):
         yield {
             "name": response.xpath("//h1/text()").get(),
-            "phone_number": response.xpath("//a[@data-ya-track='phone']/text()").get(),
+            "phone_number": response.xpath("//meta[@property='restaurant:contact_info:phone_number']/@content").get(),
             "address": self._get_address(response),
             "location": {
                 "type": "Point",
@@ -35,6 +35,7 @@ class CarlsJr(scrapy.Spider):
                     float(response.xpath("//meta[@itemprop='latitude']/@content").get())
                 ]
             },
+            "services": response.xpath("//li[@itemprop='makesOffer']//span[@itemprop='name']/text()").getall(),
             "hours": self._get_hours(response),
             "url": response.url
         }
