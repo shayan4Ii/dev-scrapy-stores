@@ -8,7 +8,8 @@ __pycache__/
 
 # C extensions
 *.so
-
+reports/*
+validator.py
 # Distribution / packaging
 .Python
 build/
@@ -123,3 +124,5 @@ test.py
 .cursorignore
 .idea/.gitignore
 Files for ehsan
+validation helper/validator.py
+validation helper/validator.py
