@@ -48,7 +48,7 @@ class Zipscarwash(scrapy.Spider):
                         float(location["latitude"])
                     ]
                 },
-                "services": [" ".join(row.xpath(".//p/text()").getall()).strip("-").strip() for row in scrapy.Selector(text=json.loads(response.text)['locations'][0]['rows']).xpath("//tr")],
+                "services": ["Cashless", "Member-Only Lanes"],
                 "hours": self._get_hours(location),
                 "url": f"https://www.zipscarwash.com/drive-through-car-wash-locations?code={location['zipcode']}&distance=60",
                 "raw": location

@@ -86,6 +86,7 @@ class Bk(scrapy.Spider):
                 "address": self._get_address(node['physicalAddress']),
                 "phone_number": node['phoneNumber'],
                 "hours": self._get_hours(node),
+                "url": f"https://www.bk.com/store-locator/store/{node['_id']}",
                 "raw": node
             }
 

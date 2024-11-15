@@ -130,6 +130,9 @@ class LittleCaesarsSpider(scrapy.Spider):
             "hasPortal": "Pizza Portal Pickup",
             "hasDriveThru": "Drive Thru",
             "hasOnlineOrdering": "Online Ordering",
+            "hasDineIn":"Dine-In",
+            "hasExpress":"Express Restaurant",
+            
         }
         for service, value in services_mapping.items():
             if features.get(service, False):

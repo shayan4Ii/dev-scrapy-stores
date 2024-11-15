@@ -35,7 +35,7 @@ class CarlsJr(scrapy.Spider):
                     float(response.xpath("//meta[@itemprop='latitude']/@content").get())
                 ]
             },
-            "services": response.xpath("//li[@itemprop='makesOffer']//span[@itemprop='name']/text()").getall(),
+            "services": response.xpath("//li[@itemprop='makesOffer' and not(@style='display: none;')]//span[@itemprop='name']/text()").getall(),
             "hours": self._get_hours(response),
             "url": response.url
         }

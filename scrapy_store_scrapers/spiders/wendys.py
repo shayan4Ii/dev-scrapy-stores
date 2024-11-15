@@ -41,7 +41,7 @@ class Wendys(scrapy.Spider):
                 ]
             },
             "hours": self._get_hours(response),
-            "services": response.xpath("//span[@itemprop='amenityFeature']/text()").getall(),
+            "services": response.xpath("//li[@class='LocationInfo-service']/span[@itemprop='amenityFeature']/text()").getall(),
             "url": response.url
         }
 

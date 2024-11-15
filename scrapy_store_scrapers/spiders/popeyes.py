@@ -82,7 +82,7 @@ class Popeyes(scrapy.Spider):
                 "phone_number": node['phoneNumber'],
                 "services": self._get_services(node),
                 "hours": self._get_hours(node),
-                "url": f"https://www.popeyes.com/store-locator/store/restaurant_{node['storeId']}",
+                "url": f"https://www.popeyes.com/store-locator/store/{node['_id']}",
                 "raw": node
             }
 

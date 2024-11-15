@@ -19,6 +19,9 @@ class Tidalwaveautospa(scrapy.Spider):
     
     def parse_locations(self, response: Response):
         obj = json.loads(response.text.split("bizDataResp =")[-1].strip().split("var locale")[0].strip().rstrip(";"))
+        # copy the object to clipboard
+        import pyperclip
+        pyperclip.copy(json.dumps(obj, indent=2))
         for location in obj['businessLocations']:
             partial_item = {
                 "number": f"{location['businessId']}",
