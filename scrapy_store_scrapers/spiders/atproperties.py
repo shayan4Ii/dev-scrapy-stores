@@ -61,7 +61,7 @@ class Atproperties(scrapy.Spider):
             if not office['hours']:
                 return {}
             for day, hours in office['hours'].items():
-                if hours.isalpha() or not hours:
+                if 'closed' in hours.lower() or 'virtual' in hours.lower() or not hours:
                     continue
                 if day.lower() in days:
                     open, close = hours.split("-")
@@ -71,5 +71,6 @@ class Atproperties(scrapy.Spider):
                     }
             return new_item
         except Exception as e:
+            print(office['hours'])
             self.logger.error("Error getting hours: %s", e, exc_info=True)
             return {}
