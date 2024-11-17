@@ -50,7 +50,7 @@ class Exxon(scrapy.Spider):
                     ]
                 },
                 "hours": self._get_hours(obj),
-                "services": response.xpath("//ul[contains(@class, 'station-details-featuredItem')]/li/text()").getall(),
+                "services": response.xpath("//ul[contains(@class, 'station-details-featuredItem') and ./preceding-sibling::h3[not(text()='Location hours')]]/li/text()").getall(),
                 "url": response.url,
                 "raw": obj
             }
