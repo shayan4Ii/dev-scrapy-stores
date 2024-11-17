@@ -139,7 +139,7 @@ if __name__ == "__main__":
     
     # Test data
     sample_hours = {
-        "openingHours": "Monday-Friday: 9:00am-5:00pm, Saturday: 10:00am-3:00pm, Sunday: Closed"
+        "openingHours": "8 AM - 7 PM Monday - Sunday"
     }
     
     # Process and display results
