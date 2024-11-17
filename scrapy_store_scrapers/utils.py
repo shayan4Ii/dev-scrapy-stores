@@ -15,10 +15,19 @@ def should_abort_request(request):
 
 def convert_to_12h_format(time_str: str) -> str:
     """Convert time to 12-hour format."""
+    time_str = time_str.lower()
     if not time_str:
         return None
     try:
-        time_str = time_str.lower().replace("am", "").replace("pm","").strip()
+        if "am" in time_str:
+            time_str = time_str.lower().replace("am", "").strip()
+            period = "am"
+        elif "pm" in time_str:
+            time_str = time_str.lower().replace("pm","").strip()
+            period = "pm"
+        else:
+            period = None
+
         if ":" in time_str:
             _format = '%H:%M'
         elif "." in time_str:
@@ -28,7 +37,13 @@ def convert_to_12h_format(time_str: str) -> str:
         else:   
             _format = '%H'
         time_obj = datetime.strptime(time_str, _format).time()
-        return time_obj.strftime('%I:%M %p').lower().lstrip('0')
+        
+        if period:
+            time_str = time_obj.strftime(f'%I:%M {period}').lower().lstrip('0')
+        else:
+            time_str = time_obj.strftime('%I:%M %p').lower().lstrip('0')
+
+        return time_str
     except ValueError:
         return None
     
@@ -174,25 +189,25 @@ class HoursExample():
 
 ########################
 
-from scrapy_playwright.handler import ScrapyPlaywrightDownloadHandler
-from scrapy_impersonate.handler import ImpersonateDownloadHandler    
+# from scrapy_playwright.handler import ScrapyPlaywrightDownloadHandler
+# from scrapy_impersonate.handler import ImpersonateDownloadHandler    
 
 
-class MuxDownloadHandler:
-    lazy = False
+# class MuxDownloadHandler:
+#     lazy = False
     
-    def __init__(self, crawler):
-        self.playwright_handler = ScrapyPlaywrightDownloadHandler.from_crawler(crawler)
-        self.impersonate_handler = ImpersonateDownloadHandler.from_crawler(crawler)
+#     def __init__(self, crawler):
+#         self.playwright_handler = ScrapyPlaywrightDownloadHandler.from_crawler(crawler)
+#         self.impersonate_handler = ImpersonateDownloadHandler.from_crawler(crawler)
 
-    @classmethod
-    def from_crawler(cls, crawler):
-        return cls(crawler)
+#     @classmethod
+#     def from_crawler(cls, crawler):
+#         return cls(crawler)
 
-    def download_request(self, request, spider):
-        if request.meta.get('playwright'):
-            return self.playwright_handler.download_request(request, spider)
-        elif request.meta.get('impersonate'):
-            return self.impersonate_handler.download_request(request, spider)
-        else:
-            return self.playwright_handler.download_request(request, spider)
+#     def download_request(self, request, spider):
+#         if request.meta.get('playwright'):
+#             return self.playwright_handler.download_request(request, spider)
+#         elif request.meta.get('impersonate'):
+#             return self.impersonate_handler.download_request(request, spider)
+#         else:
+#             return self.playwright_handler.download_request(request, spider)
