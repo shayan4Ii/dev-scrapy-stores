@@ -3,8 +3,6 @@ import scrapy
 from scrapy_store_scrapers.utils import *
 
 
-
-
 class MisterCarwash(scrapy.Spider):
     name = "mistercarwash"
     custom_settings = dict(
@@ -19,17 +17,22 @@ class MisterCarwash(scrapy.Spider):
 
 
     def start_requests(self) -> Iterable[Request]:
-        zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
-        for zipcode in zipcodes:
-            yield scrapy.Request(
-                url=f"https://mistercarwash.com/api/v1/locations/getbydistance?cLat={zipcode['latitude']}&cLng={zipcode['longitude']}&radius=100&cityName=&stateName=&allServices=true", 
-                callback=self.parse,
-                meta={"impersonate": "chrome"}
-            )
+        # zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
+        # for zipcode in zipcodes:
+        #     yield scrapy.Request(
+        #         url=f"https://mistercarwash.com/api/v1/locations/getbydistance?cLat={zipcode['latitude']}&cLng={zipcode['longitude']}&radius=100&cityName=&stateName=&allServices=true", 
+        #         callback=self.parse,
+        #         meta={"impersonate": "chrome"}
+        #     )
+        yield scrapy.Request(
+            url="https://mistercarwash.com/api/v1/locations/getbydistance?cLat=40.75368539999999&cLng=-73.9991637&radius=10&cityName=10001&stateName=New%20York&allServices=true", 
+            callback=self.parse,
+            meta={"impersonate": "chrome"}
+        )
 
     
     def parse(self, response: Response):
-        stores = json.loads(response.text)['data']['body']
+        stores = json.loads(response.text)['data']['body']['locationServicePriceDetailsModel']
         if isinstance(stores, str):
             return
         for store in stores:
