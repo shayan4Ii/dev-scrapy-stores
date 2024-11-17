@@ -13,57 +13,75 @@ class Tidalwaveautospa(scrapy.Spider):
 
 
     def parse(self, response: Response):
-        url = response.xpath("//script[contains(@src, '/embed/')]/@src").get()
-        yield scrapy.Request(url, callback=self.parse_locations)
+        location_links = response.xpath("//div[@id='accordionContent']//a[text()='View Location']/@href").getall()
+        for link in location_links:
+            yield scrapy.Request(link, callback=self.parse_location)
 
     
-    def parse_locations(self, response: Response):
-        obj = json.loads(response.text.split("bizDataResp =")[-1].strip().split("var locale")[0].strip().rstrip(";"))
-        # copy the object to clipboard
-        import pyperclip
-        pyperclip.copy(json.dumps(obj, indent=2))
-        for location in obj['businessLocations']:
-            partial_item = {
-                "number": f"{location['businessId']}",
-                "name": location['name'],
-                "address": self._get_address(location),
-                "location": {
-                    "type": "Point",
-                    "coordinates": [location['longitude'], location['latitude']]
-                },
-                "phone_number": location['phone'],
-                "raw": location
-            }
-            slug = f"{location['city']} {location['state']}".lower().replace(" ", "-")
-            url = f"https://www.tidalwaveautospa.com/location/{slug}/"
-            yield scrapy.Request(url, callback=self.parse_location, cb_kwargs={"partial_item": partial_item})
+    def parse_locations(self, response: Response, location_links: List[str]):
+        js_parsed_objects = json.loads(response.text.split("bizDataResp =")[-1].strip().split("var locale")[0].strip().rstrip(";"))["businessLocations"]
+        
+        
+        # for location in js_parsed_objects['businessLocations']:
+            # partial_item = {
+            #     "number": f"{location['businessId']}",
+            #     "name": location['name'],
+            #     "address": self._get_address(location),
+            #     "location": {
+            #         "type": "Point",
+            #         "coordinates": [location['longitude'], location['latitude']]
+            #     },
+            #     "phone_number": location['phone'],
+            #     "raw": location
+            # }
+        #     slug = f"{location['city']} {location['state']}".lower().replace(" ", "-")
+        #     url = f"https://www.tidalwaveautospa.com/location/{slug}/"
+        #     yield scrapy.Request(url, callback=self.parse_location, cb_kwargs={"partial_item": partial_item})
 
 
-    def parse_location(self, response: Response, partial_item: Dict):
-        item = partial_item.copy()
-        item["hours"] = self._get_hours(response)
-        item['url'] = response.url
+    # def parse_location(self, response: Response, partial_item: Dict):
+    #     item = partial_item.copy()
+    #     item["hours"] = self._get_hours(response)
+    #     item['url'] = response.url
+    #     yield item
+
+    def parse_location(self, response: Response):
+        
+        partial_item = {}
+        partial_item["hours"] = self._get_hours(response)
+        partial_item["url"] = response.url
+
+        js_url = response.xpath("//script[contains(@src,'embed/v6')]/@src").get()
+
+        if not js_url:
+            self.logger.error(f"JS URL not found for {response.url}")
+            return
+        
+        yield scrapy.Request(js_url, callback=self.parse_js, cb_kwargs={"partial_item": partial_item})
+
+    def parse_js(self, response: Response, partial_item: Dict):
+        js_parsed_objects = json.loads(response.text.split("var bizDataResp =")[-1].split("var locale")[0].strip().rstrip(";"))["businessLocations"]
+        if len(js_parsed_objects) != 1:
+            self.logger.error(f"Invalid JS data: {partial_item['url']} {js_parsed_objects}")
+            return
+        
+        location = js_parsed_objects[0]
+
+        js_parsed_info = {
+            "number": f"{location['businessId']}",
+            "name": location['location'],
+            "address": self._get_address(location),
+            "location": {
+                "type": "Point",
+                "coordinates": [location['longitude'], location['latitude']]
+            },
+            "phone_number": location['phone'],
+            "raw": location
+        }
+
+        item = {**js_parsed_info, **partial_item}
+        
         yield item
-
-
-    # def start_requests(self) -> Iterable[Request]:
-    #     url = "https://www.tidalwaveautospa.com/locations/"
-    #     yield scrapy.Request(url, callback=self.parse)
-
-
-    # def parse(self, response: Response):
-    #     locations = response.xpath("//a[contains(@href, '/location/') and contains(text(), 'View')]/@href").getall()
-    #     yield from response.follow_all(locations, callback=self.parse_location)
-
-
-    # def parse_location(self, response: Response):
-    #     return {
-    #         "name": response.xpath("//p[contains(@class, 'text-center h2')]/text()").get(),
-    #         "phone_number": response.xpath("//a[contains(@class, 'phone')]/text()").get(),
-    #         "location": '', # //a[contains(@class, 'convertDirections')]/@href
-    #         "address": self._get_address(response)
-    #     }
-
 
     def _get_address(self, address: Dict) -> str:
         try:
@@ -85,23 +103,46 @@ class Tidalwaveautospa(scrapy.Spider):
             self.logger.error("Error getting address: %s", e, exc_info=True)
             return ""
         
-
-    
-    def _get_hours(self, response: Response):
-        days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-        hours = {}
+    def _get_location(self, response) -> dict:
+        """Extract and format location coordinates."""
         try:
-            days_range, hours_range = [part.strip().lower() for part in response.xpath("//span[contains(text(), 'Hours')]/following-sibling::text()").getall() if part.strip()]
-            if 'am' in days_range or 'pm' in days_range:
-                days_range, hours_range = hours_range, days_range
-            hours_range = hours_range.split("exterior")[0].strip() if "exterior" in hours_range else hours_range
-            start_day, end_day = [d.strip().lower() for d in days_range.split("-")]
-            for day in days[days.index(start_day):days.index(end_day) + 1]:
-                hours[day] = {
-                    "open": convert_to_12h_format(hours_range.split("-")[0].lower().strip().replace("am", " am").replace("pm", " pm")),
-                    "close": convert_to_12h_format(hours_range.split("-")[1].lower().strip().replace("am", " am").replace("pm", " pm"))
+            lat_long_text = response.xpath('//a[@class="convertDirections h6"]/@href').re_first(r'destination=(.*)')
+            latitude, longitude = lat_long_text.split(',')
+
+            if latitude is not None and longitude is not None:
+                return {
+                    "type": "Point",
+                    "coordinates": [float(longitude), float(latitude)]
                 }
-            return hours
+            self.logger.warning(f"Missing latitude or longitude for store")
+            return {}
+        except ValueError as e:
+            self.logger.warning(f"Invalid latitude or longitude values: {e}")
+        except Exception as e:
+            self.logger.error(f"Error extracting location: {e}", exc_info=True)
+        return {}
+        
+    def _get_hours(self, response: Response) -> dict[str, dict[str, str]]:
+        """Extract and parse store hours."""
+        try:
+            hours_texts = response.xpath("//span[contains(text(), 'Hours')]/following-sibling::text()").getall()
+            hours_texts = [text.strip() for text in hours_texts if text.strip()]
+
+            if len(hours_texts) == 2 and "day" in hours_texts[1]:
+                hours_texts = hours_texts[::-1]
+            
+            hours = " ".join(hours_texts).strip()
+            if not hours:
+                self.logger.warning(f"No hours found for store {response.url}")
+                return {}
+
+            if 'coming' in hours.lower():
+                self.logger.warning(f"Store is not open yet: {hours}, {response.url}")
+                return {}
+            hours_example = HoursExample()
+            normalized_hours = hours_example.normalize_hours_text(hours)
+            return hours_example._parse_business_hours(normalized_hours)
         except Exception as e:
             self.logger.error(f"Error getting store hours: {e}", exc_info=True)
             return {}
+
