@@ -17,34 +17,6 @@ class Tidalwaveautospa(scrapy.Spider):
         for link in location_links:
             yield scrapy.Request(link, callback=self.parse_location)
 
-    
-    def parse_locations(self, response: Response, location_links: List[str]):
-        js_parsed_objects = json.loads(response.text.split("bizDataResp =")[-1].strip().split("var locale")[0].strip().rstrip(";"))["businessLocations"]
-        
-        
-        # for location in js_parsed_objects['businessLocations']:
-            # partial_item = {
-            #     "number": f"{location['businessId']}",
-            #     "name": location['name'],
-            #     "address": self._get_address(location),
-            #     "location": {
-            #         "type": "Point",
-            #         "coordinates": [location['longitude'], location['latitude']]
-            #     },
-            #     "phone_number": location['phone'],
-            #     "raw": location
-            # }
-        #     slug = f"{location['city']} {location['state']}".lower().replace(" ", "-")
-        #     url = f"https://www.tidalwaveautospa.com/location/{slug}/"
-        #     yield scrapy.Request(url, callback=self.parse_location, cb_kwargs={"partial_item": partial_item})
-
-
-    # def parse_location(self, response: Response, partial_item: Dict):
-    #     item = partial_item.copy()
-    #     item["hours"] = self._get_hours(response)
-    #     item['url'] = response.url
-    #     yield item
-
     def parse_location(self, response: Response):
         
         partial_item = {}
