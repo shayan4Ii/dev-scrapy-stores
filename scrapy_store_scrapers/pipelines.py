@@ -14,16 +14,16 @@ class DuplicateItemPipeline:
 
     def process_item(self, item, spider):
         number = item.get("number")
-        name = item.get("name")
+        address = item.get("address")
 
         if number:
             if number in self.items:
                 raise DropItem(f"Duplicate item found: {item['number']}")
             self.items.add(number)
-        elif name:
-            if name in self.items:
-                raise DropItem(f"Duplicate item found: {item['name']}")
-            self.items.add(name)
+        elif address:
+            if address in self.items:
+                raise DropItem(f"Duplicate item found: {item['address']}")
+            self.items.add(address)
         else:
             spider.logger.warning("Item cannot be checked for duplicates because it is missing a number or name")
 
