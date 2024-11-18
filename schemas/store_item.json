@@ -1,131 +1,115 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema",
-    "type": "object",
-    "$defs": {
-        "daySchedule": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["open", "close"],
-          "properties": {
-            "open": {
-              "type": "string",
-              "pattern": "^(0?[1-9]|1[0-2]):[0-5][0-9]\\s*(?i)(am|pm)$"
-            },
-            "close": {
-              "type": "string",
-              "pattern": "^(0?[1-9]|1[0-2]):[0-5][0-9]\\s*(?i)(am|pm)$"
-            }
-          }
-        },
-        "weekendSchedule": {
-          "type": "object", 
-          "additionalProperties": false,
-          "required": ["open", "close"],
-          "properties": {
-            "open": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "pattern": "^(0?[1-9]|1[0-2]):[0-5][0-9]\\s*(?i)(am|pm)$"
-                },
-                {"type": "null"}
-              ]
-            },
-            "close": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "pattern": "^(0?[1-9]|1[0-2]):[0-5][0-9]\\s*(?i)(am|pm)$"
-                },
-                {"type": "null"}
-              ]
-            }
-          }
-        }
-    },
-
-    "properties": {
-      "number": {
-        "type": ["string", "null"]
-      },
-      "name": {
-        "type": ["string", "null"]
-      },
-      "address": {
-        "type": "string",
-        "pattern": "\\d{5}$",
-        "description": "Address in format: <street>, <city>, <state> <zipcode>"
-      },
-      "location": {
-        "type": "object",
-        "required": ["type", "coordinates"],
-        "properties": {
-          "type": {
-            "type": "string"
-          },
-          "coordinates": {
-            "type": "array",
-            "minItems": 2,
-            "maxItems": 2,
-            "items": [
-              {
-                "type": "number",
-                "minimum": -180,
-                "maximum": 180,
-                "description": "Longitude"
-              },
-              {
-                "type": "number",
-                "minimum": -90,
-                "maximum": 90,
-                "description": "Latitude"
-              }
-            ]
-          }
-        }
-      },
-      "phone_number": {
-        "type": ["string", "null"]
-      },
-      "hours": {
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "$defs": {
+      "timeSlot": {
         "type": "object",
         "additionalProperties": false,
+        "required": ["open", "close"],
         "properties": {
-          "monday": {"$ref": "#/$defs/daySchedule"},
-          "tuesday": {"$ref": "#/$defs/daySchedule"},
-          "wednesday": {"$ref": "#/$defs/daySchedule"},
-          "thursday": {"$ref": "#/$defs/daySchedule"},
-          "friday": {"$ref": "#/$defs/daySchedule"},
-          "saturday": {
-            "oneOf": [
-                  {"$ref": "#/$defs/weekendSchedule"},
-                  {"type": "null"}
-              ]
-            },
-          "sunday": {
-              "oneOf": [
-                  {"$ref": "#/$defs/weekendSchedule"},
-                  {"type": "null"}
-              ]
-            }
+          "open": {
+            "type": "string",
+            "pattern": "^(0?[1-9]|1[0-2]):[0-5][0-9]\\s*(?i)(am|pm)$"
+          },
+          "close": {
+            "type": "string",
+            "pattern": "^(0?[1-9]|1[0-2]):[0-5][0-9]\\s*(?i)(am|pm)$"
           }
+        }
       },
-      "services": {
-        "type": "array"
+      "daySchedule": {
+        "oneOf": [
+          {
+            "type": "array",
+            "items": { "$ref": "#/$defs/timeSlot" }
+          },
+          { "$ref": "#/$defs/timeSlot" },
+          { "type": "null" }
+        ]
       },
-      "url": {
-        "type": "string",
-        "pattern": "^https?://"
-      },
-      "raw": {
-        "type": "object"
-      },
-      "coming_soon": {
-        "type": "boolean"
+      "weekendSchedule": {
+        "oneOf": [
+          {
+            "type": "array",
+            "items": { "$ref": "#/$defs/timeSlot" }
+          },
+          { "$ref": "#/$defs/timeSlot" },
+          { "type": "null" }
+        ]
+      }
+  },
+  "properties": {
+    "number": {
+      "type": ["string", "null"]
+    },
+    "name": {
+      "type": ["string", "null"]
+    },
+    "address": {
+      "type": "string",
+      "pattern": "\\d{5}$",
+      "description": "Address in format: <street>, <city>, <state> <zipcode>"
+    },
+    "location": {
+      "type": "object",
+      "required": ["type", "coordinates"],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "coordinates": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": [
+            {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180,
+              "description": "Longitude"
+            },
+            {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90,
+              "description": "Latitude"
+            }
+          ]
+        }
       }
     },
-    "required": [
-      "address",
-      "location"
-    ]
-  }
+    "phone_number": {
+      "type": ["string", "null"]
+    },
+    "hours": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "monday": { "$ref": "#/$defs/daySchedule" },
+        "tuesday": { "$ref": "#/$defs/daySchedule" },
+        "wednesday": { "$ref": "#/$defs/daySchedule" },
+        "thursday": { "$ref": "#/$defs/daySchedule" },
+        "friday": { "$ref": "#/$defs/daySchedule" },
+        "saturday": { "$ref": "#/$defs/weekendSchedule" },
+        "sunday": { "$ref": "#/$defs/weekendSchedule" }
+      }
+    },
+    "services": {
+      "type": "array"
+    },
+    "url": {
+      "type": "string",
+      "pattern": "^https?://"
+    },
+    "raw": {
+      "type": "object"
+    },
+    "coming_soon": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "address",
+    "location"
+  ]
+}
