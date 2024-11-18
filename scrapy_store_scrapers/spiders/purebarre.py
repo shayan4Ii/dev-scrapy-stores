@@ -52,12 +52,22 @@ class PureBarre(scrapy.Spider):
         if hours is None:
             return partial_item
         obj = json.loads(hours)
+        partial_item["raw"]["hours"] = obj
         for day, hours in obj.items():
-            if hours:
+            if len(hours) == 1:
                 partial_item['hours'][day] = {
                     "open": convert_to_12h_format(hours[0][0]),
                     "close": convert_to_12h_format(hours[0][1]),
                 }
+            elif len(hours) > 1:
+                partial_item['hours'][day] = [{
+                    "open": convert_to_12h_format(hour[0]),
+                    "close": convert_to_12h_format(hour[1]),
+                } for hour in hours]
+            else:
+                self.logger.error(f"Invalid hours: {hours} for {partial_item['url']}")
+                partial_item['hours'][day] = None
+
         item = partial_item
         return item
 
