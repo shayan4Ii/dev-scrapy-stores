@@ -189,25 +189,25 @@ class HoursExample():
 
 ########################
 
-# from scrapy_playwright.handler import ScrapyPlaywrightDownloadHandler
-# from scrapy_impersonate.handler import ImpersonateDownloadHandler    
+from scrapy_playwright.handler import ScrapyPlaywrightDownloadHandler
+from scrapy_impersonate.handler import ImpersonateDownloadHandler    
 
 
-# class MuxDownloadHandler:
-#     lazy = False
+class MuxDownloadHandler:
+    lazy = False
     
-#     def __init__(self, crawler):
-#         self.playwright_handler = ScrapyPlaywrightDownloadHandler.from_crawler(crawler)
-#         self.impersonate_handler = ImpersonateDownloadHandler.from_crawler(crawler)
+    def __init__(self, crawler):
+        self.playwright_handler = ScrapyPlaywrightDownloadHandler.from_crawler(crawler)
+        self.impersonate_handler = ImpersonateDownloadHandler.from_crawler(crawler)
 
-#     @classmethod
-#     def from_crawler(cls, crawler):
-#         return cls(crawler)
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
 
-#     def download_request(self, request, spider):
-#         if request.meta.get('playwright'):
-#             return self.playwright_handler.download_request(request, spider)
-#         elif request.meta.get('impersonate'):
-#             return self.impersonate_handler.download_request(request, spider)
-#         else:
-#             return self.playwright_handler.download_request(request, spider)
+    def download_request(self, request, spider):
+        if request.meta.get('playwright'):
+            return self.playwright_handler.download_request(request, spider)
+        elif request.meta.get('impersonate'):
+            return self.impersonate_handler.download_request(request, spider)
+        else:
+            return self.playwright_handler.download_request(request, spider)
