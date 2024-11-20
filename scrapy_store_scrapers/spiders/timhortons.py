@@ -47,7 +47,7 @@ class TimHortons(scrapy.Spider):
             "url": response.url,
             "services": [txt.strip() for txt in response.xpath("//div[@class='lp-banner-features']/ul/li/text()").getall() if txt.strip()],
         }
-        if not hours:
+        if not item['hours']:
             item['is_permanently_closed'] = True
         return item
 
