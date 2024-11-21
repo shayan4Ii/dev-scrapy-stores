@@ -9,83 +9,68 @@ from scrapy.http import JsonRequest
 class DairyQueen(scrapy.Spider):
     name = "dairyqueen"
     custom_settings = dict(
-        PLAYWRIGHT_ABORT_REQUEST = should_abort_request,
-        PLAYWRIGHT_BROWSER_TYPE = "firefox",
-        PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = 30*1000,
-        PLAYWRIGHT_MAX_CONTEXTS = 1,
         DOWNLOAD_HANDLERS = {
-            "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+            "http": "scrapy_impersonate.ImpersonateDownloadHandler",
+            "https": "scrapy_impersonate.ImpersonateDownloadHandler",
         },
-        USER_AGENT = None,
-        PLAYWRIGHT_PROCESS_REQUEST_HEADERS = None,
-        CONCURRENT_REQUESTS = 1,
+        USER_AGENT = None
     )
 
-
-    def start_requests(self) -> Iterable[Request]:
-        url = "https://www.dairyqueen.com/en-us/locations/"
-        yield scrapy.Request(url, callback=self.parse)
-
-
-    def parse(self, response: Response):
-        states = response.xpath("//a[contains(@aria-label, 'View')]/@href").getall()
-        yield from response.follow_all(urls=states, callback=self.parse_state)
-
-
-    def parse_state(self, response: Response):
-        cities = response.xpath("//a[contains(@aria-label, 'View locations')]/@href").getall()
-        yield from response.follow_all(urls=cities, callback=self.parse_city, meta={
-            "playwright": True,
-            "playwright_page_methods": [
-                PageMethod("wait_for_selector", "//a[contains(@title, 'Report error')]")
-            ]
-        })
-
     
-    def parse_city(self, response: Response):
-        get_coordinates = lambda url: url.split("/@")[-1].split("/")[0].split(",")[:-1] if "/@" in url else (None, None)
-        map_url = response.xpath("//a[contains(@title, 'Report error')]/@href").get()
-        if map_url is None or "/@" not in map_url:
-            self.logger.info(f"Coordinates are not found for store: {response.url}")
-            return
-        lat, lng = get_coordinates(map_url)
-        json_data = {
-            'operationName': 'NearbyStores',
-            'variables': {
-                'lat': float(lat),
-                'lng': float(lng),
-                'country': 'US',
-                'searchRadius': 25,
-            },
-            'query': 'fragment StoreDetailFields on Store {\n  id\n  storeNo\n  address3\n  city\n  stateProvince\n  postalCode\n  country\n  latitude\n  longitude\n  phone\n  availabilityStatus\n  conceptType\n  restaurantId\n  utcOffset\n  supportedTimeModes\n  advanceOrderDays\n  storeHours(hoursFormat: "yyyy/MM/dd HH:mm") {\n    calendarType\n    ranges {\n      start\n      end\n      weekday\n      __typename\n    }\n    __typename\n  }\n  minisite {\n    webLinks {\n      isDeliveryPartner\n      description\n      url\n      __typename\n    }\n    hours {\n      calendarType\n      ranges {\n        start\n        end\n        weekday\n        __typename\n      }\n      __typename\n    }\n    amenities {\n      description\n      featureId\n      __typename\n    }\n    __typename\n  }\n  flags {\n    blizzardFanClubFlag\n    brazierFlag\n    breakfastFlag\n    cakesFlag\n    canPickup\n    comingSoonFlag\n    creditCardFlag\n    curbSideFlag\n    deliveryFlag\n    dispatchFlag\n    driveThruFlag\n    foodAndTreatsFlag\n    giftCardsFlag\n    mobileDealsFlag\n    mobileOrderingFlag\n    mtdFlag\n    ojQuenchClubFlag\n    onlineOrderingFlag\n    ojFlag\n    temporarilyClosedFlag\n    supportsManualFire\n    supportsSplitPayments\n    isCurrentlyOpen\n    __typename\n  }\n  labels {\n    key\n    value\n    __typename\n  }\n  __typename\n}\n\nquery NearbyStores($lat: Float!, $lng: Float!, $country: String!, $searchRadius: Int!) {\n  nearbyStores(\n    lat: $lat\n    lon: $lng\n    country: $country\n    radiusMiles: $searchRadius\n    limit: 50\n    first: 20\n    order: {distance: ASC}\n  ) {\n    pageInfo {\n      endCursor\n      hasNextPage\n      __typename\n    }\n    nodes {\n      distance\n      distanceType\n      store {\n        ...StoreDetailFields\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n',
-        }
-        yield JsonRequest(
-            url="https://prod-api.dairyqueen.com/graphql/", 
-            method="POST", 
-            data=json_data, 
-            callback=self.parse_stores,
-            headers={'partner-platform': 'Web'},
-            cb_kwargs={"source": response.url}
-        )
+    def start_requests(self) -> Iterable[Request]:
+        zipcodes = load_zipcode_data("data/zipcode_lat_long.json")
+        for zipcode in zipcodes:
+            json_data = {
+                'operationName': 'NearbyStores',
+                'variables': {
+                    'lat': zipcode['latitude'],
+                    'lng': zipcode['longitude'],
+                    'country': 'US',
+                    'searchRadius': 25,
+                },
+                'query': 'fragment StoreDetailFields on Store {\n  id\n  storeNo\n  address3\n  city\n  stateProvince\n  postalCode\n  country\n  latitude\n  longitude\n  phone\n  availabilityStatus\n  conceptType\n  restaurantId\n  utcOffset\n  supportedTimeModes\n  advanceOrderDays\n  storeHours(hoursFormat: "yyyy/MM/dd HH:mm") {\n    calendarType\n    ranges {\n      start\n      end\n      weekday\n      __typename\n    }\n    __typename\n  }\n  minisite {\n    webLinks {\n      isDeliveryPartner\n      description\n      url\n      __typename\n    }\n    hours {\n      calendarType\n      ranges {\n        start\n        end\n        weekday\n        __typename\n      }\n      __typename\n    }\n    amenities {\n      description\n      featureId\n      __typename\n    }\n    __typename\n  }\n  flags {\n    blizzardFanClubFlag\n    brazierFlag\n    breakfastFlag\n    cakesFlag\n    canPickup\n    comingSoonFlag\n    creditCardFlag\n    curbSideFlag\n    deliveryFlag\n    dispatchFlag\n    driveThruFlag\n    foodAndTreatsFlag\n    giftCardsFlag\n    mobileDealsFlag\n    mobileOrderingFlag\n    mtdFlag\n    ojQuenchClubFlag\n    onlineOrderingFlag\n    ojFlag\n    temporarilyClosedFlag\n    supportsManualFire\n    supportsSplitPayments\n    isCurrentlyOpen\n    __typename\n  }\n  labels {\n    key\n    value\n    __typename\n  }\n  __typename\n}\n\nquery NearbyStores($lat: Float!, $lng: Float!, $country: String!, $searchRadius: Int!) {\n  nearbyStores(\n    lat: $lat\n    lon: $lng\n    country: $country\n    radiusMiles: $searchRadius\n    limit: 50\n    first: 20\n    order: {distance: ASC}\n  ) {\n    pageInfo {\n      endCursor\n      hasNextPage\n      __typename\n    }\n    nodes {\n      distance\n      distanceType\n      store {\n        ...StoreDetailFields\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n',
+            }
+            yield JsonRequest(
+                url="https://prod-api.dairyqueen.com/graphql/", 
+                method="POST", 
+                data=json_data, 
+                callback=self.parse_stores,
+                headers={'partner-platform': 'Web'},
+                meta={"impersonate": "chrome"}
+            )
 
 
-    def parse_stores(self, response: Response, source: str):
+    def parse_stores(self, response: Response):
         nodes = response.json().get("data", {}).get("nearbyStores", {}).get("nodes", [])
         for node in nodes:
             store = node.get("store")
-            yield {
+            item = {
                 "number": store.get("storeNo"),
                 "location": {
                     "type": "Point",
                     "coordinates": [store.get("longitude"), store.get("latitude")]
                 },
-                "url": source,
+                "url": self._get_url(store),
                 "raw": store,
                 "address": self._get_address(store),
                 "phone_number": store.get("phone"),
                 "hours": self._get_hours(store.get("storeHours"))
             }
+            yield scrapy.Request(url=item['url'], callback=self.parse_store, cb_kwargs={"partial_item": item})
 
+
+    def parse_store(self, response: Response, partial_item: Dict):
+        services = response.xpath("//div[contains(@data-cy,'amenities-')]/span[contains(@class, 'body')]/text()").getall()
+        coming_soon = bool(response.xpath("//p[@data-cy='todaysHoursType-text-bff-COMING_SOON']"))
+        is_permanently_closed = bool(response.xpath("//p[@data-cy='todaysHoursType-text-bff-CLOSED']"))
+        item = {
+            **partial_item, 
+            "services": services,
+            "coming_soon": coming_soon, 
+            "is_permanently_closed": is_permanently_closed
+        }
+        return item
+    
 
     def _get_address(self, store: Dict) -> str:
         try:
@@ -108,7 +93,6 @@ class DairyQueen(scrapy.Spider):
         except Exception as e:
             self.logger.error("Error getting address: %s", e, exc_info=True)
             return ""
-
 
 
     def _get_hours(self, hours_data: List):
@@ -136,3 +120,12 @@ class DairyQueen(scrapy.Spider):
         except Exception as e:
             self.logger.error("Error getting hours: %s", e, exc_info=True)
             return {}
+
+
+    def _get_url(self, store: Dict):
+        state = store.get("stateProvince", "").lower()
+        city = store.get("city", "").lower().replace(" ","-")
+        address = store.get("address3", "").lower().replace(" ","-")
+        id = store.get("id", "")
+        return f"https://www.dairyqueen.com/en-us/locations/{state}/{city}/{address}/{id}/"
+
