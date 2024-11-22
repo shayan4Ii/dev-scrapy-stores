@@ -7,4 +7,3 @@ spidermon[monitoring]
 curl_cffi
 scrapy-impersonate
 scrapy-playwright
-chompjs
